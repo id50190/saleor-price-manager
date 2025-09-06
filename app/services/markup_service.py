@@ -1,13 +1,13 @@
 from decimal import Decimal
 from typing import Dict, Optional
 import json
-import aioredis
+import redis.asyncio as redis
 from app.core.config import settings
 from app.saleor.api import get_channel, update_channel_metadata
 
 class MarkupService:
     def __init__(self):
-        self.redis = aioredis.from_url(settings.REDIS_URL)
+        self.redis = redis.from_url(settings.REDIS_URL)
         
     async def get_channel_markup(self, channel_id: str) -> Optional[Decimal]:
         """Получить процент наценки для канала"""

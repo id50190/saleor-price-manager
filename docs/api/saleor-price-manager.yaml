@@ -1,0 +1,531 @@
+openapi: "3.1.0"
+info:
+  title: "Saleor Price Manager"
+  description: |
+    FastAPI service for managing dynamic pricing across multiple Saleor channels.
+
+    This service allows you to:
+    - Apply percentage-based markups to base product prices per channel
+    - Manage channel-specific pricing strategies for multi-regional eCommerce
+    - Handle real-time price calculations via API
+    - Process Saleor webhooks for automated price updates
+
+    **Authentication**: Bearer token authentication using Saleor app tokens
+
+    **Caching**: Redis-backed caching for improved performance
+  version: "1.0.0"
+  contact:
+    name: "Saleor Price Manager API"
+    url: "https://github.com/boldsoftware/bold"
+  license:
+    name: "MIT"
+    url: "https://opensource.org/licenses/MIT"
+
+servers:
+  - url: "http://localhost:8000"
+    description: "Local development server"
+  - url: "https://your-price-manager.example.com"
+    description: "Production server"
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: "Health Check"
+      description: "Check if the service is running and healthy"
+      tags: ["Health"]
+      security: []  # No authentication required
+      responses:
+        '200':
+          description: "Service is healthy"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+              example:
+                status: "ok"
+
+  /api/channels/:
+    get:
+      summary: "List All Channels"
+      description: |
+        Retrieve a list of all Saleor channels with their current markup percentages.
+
+        This endpoint queries Saleor API for channel information and enriches it with
+        markup data from Redis cache or Saleor metadata.
+      tags: ["Channels"]
+      responses:
+        '200':
+          description: "Successfully retrieved channels list"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChannelWithMarkup"
+              example:
+                - id: "Q2hhbm5lbDox"
+                  name: "Moscow Store"
+                  slug: "moscow"
+                  markup_percent: "15.00"
+                  metadata:
+                    - key: "price_markup_percent"
+                      value: "15.00"
+                - id: "Q2hhbm5lbDoy"
+                  name: "SPb Store"
+                  slug: "spb"
+                  markup_percent: "10.00"
+                  metadata:
+                    - key: "price_markup_percent"
+                      value: "10.00"
+        '401':
+          $ref: "#/components/responses/Unauthorized"
+        '500':
+          $ref: "#/components/responses/InternalError"
+
+  /api/channels/markup:
+    post:
+      summary: "Set Channel Markup"
+      description: |
+        Set or update the percentage markup for a specific channel.
+
+        This will:
+        1. Update the channel metadata in Saleor via GraphQL API
+        2. Update the Redis cache for immediate access
+        3. Trigger price recalculation for products in this channel
+      tags: ["Channels"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChannelMarkupRequest"
+            example:
+              channel_id: "Q2hhbm5lbDox"
+              markup_percent: 15.5
+      responses:
+        '200':
+          description: "Markup successfully updated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelMarkupResponse"
+              example:
+                success: true
+                markup:
+                  channel_id: "Q2hhbm5lbDox"
+                  markup_percent: 15.5
+        '400':
+          description: "Failed to update channel markup"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                detail: "Failed to update channel markup"
+        '401':
+          $ref: "#/components/responses/Unauthorized"
+        '422':
+          $ref: "#/components/responses/ValidationError"
+
+  /api/prices/calculate:
+    post:
+      summary: "Calculate Product Price"
+      description: |
+        Calculate the final price for a product in a specific channel,
+        applying the channel's markup percentage to the base price.
+
+        Formula: `final_price = base_price * (1 + markup_percent / 100)`
+      tags: ["Pricing"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceCalculationRequest"
+            example:
+              product_id: "UHJvZHVjdDox"
+              channel_id: "Q2hhbm5lbDox"
+              base_price: 100.00
+      responses:
+        '200':
+          description: "Price calculated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceCalculationResponse"
+              example:
+                product_id: "UHJvZHVjdDox"
+                channel_id: "Q2hhbm5lbDox"
+                base_price: "100.00"
+                markup_percent: "15.00"
+                final_price: "115.00"
+                currency: "USD"
+        '401':
+          $ref: "#/components/responses/Unauthorized"
+        '422':
+          $ref: "#/components/responses/ValidationError"
+
+  /api/prices/batch-calculate:
+    post:
+      summary: "Batch Calculate Prices"
+      description: |
+        Calculate prices for multiple products across different channels in a single request.
+
+        Useful for bulk price updates or when processing large product catalogs.
+      tags: ["Pricing"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/PriceCalculationRequest"
+              example:
+                - product_id: "UHJvZHVjdDox"
+                  channel_id: "Q2hhbm5lbDox"
+                  base_price: 100.00
+                - product_id: "UHJvZHVjdDoy"
+                  channel_id: "Q2hhbm5lbDoy"
+                  base_price: 200.00
+      responses:
+        '200':
+          description: "Batch calculation completed"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PriceCalculationResponse"
+              example:
+                - product_id: "UHJvZHVjdDox"
+                  channel_id: "Q2hhbm5lbDox"
+                  base_price: "100.00"
+                  markup_percent: "15.00"
+                  final_price: "115.00"
+                  currency: "USD"
+                - product_id: "UHJvZHVjdDoy"
+                  channel_id: "Q2hhbm5lbDoy"
+                  base_price: "200.00"
+                  markup_percent: "10.00"
+                  final_price: "220.00"
+                  currency: "USD"
+        '401':
+          $ref: "#/components/responses/Unauthorized"
+        '422':
+          $ref: "#/components/responses/ValidationError"
+
+  /webhooks/product-updated:
+    post:
+      summary: "Handle Product Updated Webhook"
+      description: |
+        Webhook endpoint for Saleor PRODUCT_UPDATED events.
+
+        When a product is updated in Saleor, this endpoint triggers
+        background price recalculation for all channels.
+
+        **Note**: This endpoint is called by Saleor Cloud and doesn't require
+        bearer token authentication (uses webhook signatures instead).
+      tags: ["Webhooks"]
+      security: []  # Webhook authentication handled separately
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaleorWebhookPayload"
+            example:
+              event_type: "PRODUCT_UPDATED"
+              product_id: "UHJvZHVjdDox"
+              data:
+                product:
+                  id: "UHJvZHVjdDox"
+                  name: "Updated Product Name"
+      responses:
+        '200':
+          description: "Webhook received and processed"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "received"
+        '400':
+          description: "Invalid webhook payload"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                detail: "Invalid webhook payload"
+
+  /webhooks/channel-created:
+    post:
+      summary: "Handle Channel Created Webhook"
+      description: |
+        Webhook endpoint for Saleor CHANNEL_CREATED events.
+
+        When a new channel is created in Saleor, this endpoint
+        invalidates related caches and prepares the channel for markup management.
+      tags: ["Webhooks"]
+      security: []  # Webhook authentication handled separately
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaleorWebhookPayload"
+            example:
+              event_type: "CHANNEL_CREATED"
+              channel_id: "Q2hhbm5lbDoz"
+              data:
+                channel:
+                  id: "Q2hhbm5lbDoz"
+                  name: "New Regional Store"
+                  slug: "new-region"
+      responses:
+        '200':
+          description: "Webhook received and processed"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "received"
+        '400':
+          description: "Invalid webhook payload"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Saleor App JWT token"
+
+  schemas:
+    ChannelWithMarkup:
+      type: object
+      properties:
+        id:
+          type: string
+          description: "Base64 encoded Saleor channel ID"
+          example: "Q2hhbm5lbDox"
+        name:
+          type: string
+          description: "Human-readable channel name"
+          example: "Moscow Store"
+        slug:
+          type: string
+          description: "URL-friendly channel identifier"
+          example: "moscow"
+        markup_percent:
+          type: string
+          format: decimal
+          description: "Current markup percentage for this channel"
+          example: "15.00"
+        metadata:
+          type: array
+          description: "Channel metadata from Saleor"
+          items:
+            $ref: "#/components/schemas/MetadataItem"
+      required: ["id", "name", "slug", "markup_percent"]
+
+    MetadataItem:
+      type: object
+      properties:
+        key:
+          type: string
+          example: "price_markup_percent"
+        value:
+          type: string
+          example: "15.00"
+      required: ["key", "value"]
+
+    ChannelMarkupRequest:
+      type: object
+      properties:
+        channel_id:
+          type: string
+          description: "Base64 encoded Saleor channel ID"
+          example: "Q2hhbm5lbDox"
+        markup_percent:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1000.0
+          description: "Markup percentage (0-1000)"
+          example: 15.5
+      required: ["channel_id", "markup_percent"]
+
+    ChannelMarkupResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        markup:
+          $ref: "#/components/schemas/ChannelMarkupRequest"
+      required: ["success", "markup"]
+
+    PriceCalculationRequest:
+      type: object
+      properties:
+        product_id:
+          type: string
+          description: "Base64 encoded Saleor product ID"
+          example: "UHJvZHVjdDox"
+        channel_id:
+          type: string
+          description: "Base64 encoded Saleor channel ID"
+          example: "Q2hhbm5lbDox"
+        base_price:
+          type: number
+          format: decimal
+          description: "Base price before markup"
+          example: 100.00
+      required: ["product_id", "channel_id", "base_price"]
+
+    PriceCalculationResponse:
+      type: object
+      properties:
+        product_id:
+          type: string
+          description: "Base64 encoded Saleor product ID"
+          example: "UHJvZHVjdDox"
+        channel_id:
+          type: string
+          description: "Base64 encoded Saleor channel ID"
+          example: "Q2hhbm5lbDox"
+        base_price:
+          type: string
+          format: decimal
+          description: "Original base price"
+          example: "100.00"
+        markup_percent:
+          type: string
+          format: decimal
+          description: "Applied markup percentage"
+          example: "15.00"
+        final_price:
+          type: string
+          format: decimal
+          description: "Final price after markup"
+          example: "115.00"
+        currency:
+          type: string
+          description: "Currency code"
+          example: "USD"
+      required: ["product_id", "channel_id", "base_price", "markup_percent", "final_price", "currency"]
+
+    SaleorWebhookPayload:
+      type: object
+      properties:
+        event_type:
+          type: string
+          enum: ["PRODUCT_UPDATED", "CHANNEL_CREATED"]
+          description: "Type of Saleor event"
+          example: "PRODUCT_UPDATED"
+        product_id:
+          type: string
+          nullable: true
+          description: "Product ID for product-related events"
+          example: "UHJvZHVjdDox"
+        channel_id:
+          type: string
+          nullable: true
+          description: "Channel ID for channel-related events"
+          example: "Q2hhbm5lbDox"
+        data:
+          type: object
+          additionalProperties: true
+          description: "Additional event data from Saleor"
+          example:
+            product:
+              id: "UHJvZHVjdDox"
+              name: "Sample Product"
+      required: ["event_type"]
+
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: "Error description"
+          example: "An error occurred"
+      required: ["detail"]
+
+    ValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  anyOf:
+                    - type: string
+                    - type: integer
+              msg:
+                type: string
+              type:
+                type: string
+          example:
+            - loc: ["body", "markup_percent"]
+              msg: "ensure this value is greater than or equal to 0"
+              type: "value_error.number.not_ge"
+      required: ["detail"]
+
+  responses:
+    Unauthorized:
+      description: "Authentication required or token invalid"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            detail: "Not authenticated"
+
+    ValidationError:
+      description: "Request validation failed"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+
+    InternalError:
+      description: "Internal server error"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            detail: "Internal server error"
+
+tags:
+  - name: "Health"
+    description: "Service health monitoring"
+  - name: "Channels"
+    description: "Saleor channel management and markup configuration"
+  - name: "Pricing"
+    description: "Price calculation with channel-specific markups"
+  - name: "Webhooks"
+    description: "Saleor webhook event handlers"

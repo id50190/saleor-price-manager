@@ -11,7 +11,7 @@ from app.saleor.client import init_saleor_client
 
 app = FastAPI(
   title='Saleor Price Manager',
-  description='Service for managing pricing across multiple Saleor channels',
+  description='FastAPI service for managing dynamic pricing across multiple Saleor channels with percentage-based markups and Redis caching',
   version='1.0.0',
   docs_url='/docs',                   # Путь для Swagger UI
   redoc_url='/redoc',                 # Путь для ReDoc
