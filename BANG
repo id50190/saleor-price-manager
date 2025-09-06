@@ -161,15 +161,14 @@ if [[ "$START_FRONTEND" == "true" ]]; then
   # Sync backend host/port to frontend environment
   echo "Syncing API configuration to frontend..."
   API_HOST=${APPLICATION_HOST}
-  # Convert 0.0.0.0 to localhost for frontend (browser can't connect to 0.0.0.0)
-  # Keep 127.0.0.1 as is for consistency with backend
-  if [[ "$API_HOST" == "0.0.0.0" ]]; then
-    API_HOST="localhost"
-  fi
+  # Keep host as-is to match CORS configuration
+  # Host must match exactly what's configured in CORS_ORIGINS
   
   cat > frontend/.env << EOF
 # Auto-generated from backend configuration
 VITE_API_BASE_URL=http://${API_HOST}:${APPLICATION_PORT}
+VITE_HOST=${APPLICATION_HOST}
+VITE_PORT=${APPLICATION_PORT_FRONTEND:-3000}
 VITE_APP_TITLE="Saleor Price Manager"
 VITE_API_TIMEOUT=10000
 EOF
@@ -183,14 +182,14 @@ EOF
   export VITE_DISABLE_FS_WATCHER=true
   
   if command -v pnpm &> /dev/null; then
-    pnpm dev &
+    pnpm dev --host ${APPLICATION_HOST} --port ${APPLICATION_PORT_FRONTEND:-3000} &
   else
-    npm run dev &
+    npm run dev -- --host ${APPLICATION_HOST} --port ${APPLICATION_PORT_FRONTEND:-3000} &
   fi
   FRONTEND_PID=$!
   cd ..
   
-  echo "🌐 Frontend starting at: http://localhost:3000"
+  echo "🌐 Frontend starting at: http://${APPLICATION_HOST}:${APPLICATION_PORT_FRONTEND:-3000}"
   echo "🔍 Frontend PID: $FRONTEND_PID"
   
   # Function to cleanup frontend process

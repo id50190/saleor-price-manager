@@ -1,5 +1,10 @@
 // @ts-check
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
+
+// Get backend URL from environment
+const APPLICATION_HOST = process.env.APPLICATION_HOST || '127.0.0.1';
+const APPLICATION_PORT = process.env.APPLICATION_PORT || '8000';
+const BACKEND_URL = `http://${APPLICATION_HOST}:${APPLICATION_PORT}`;
 
 test.describe('Homepage', () => {
   test('should load the homepage', async ({ page }) => {
@@ -18,9 +23,9 @@ test.describe('Homepage', () => {
     await expect(page.locator('.api-info')).toBeVisible();
     await expect(page.locator('.api-info h3')).toContainText('API Information');
     
-    // Check if backend links are present
-    await expect(page.locator('a[href="http://localhost:8000/docs"]')).toBeVisible();
-    await expect(page.locator('a[href="http://localhost:8000/health"]')).toBeVisible();
+    // Check if backend links are present in API info section
+    await expect(page.locator(`.api-info a[href="${BACKEND_URL}/docs"]`)).toBeVisible();
+    await expect(page.locator(`.api-info a[href="${BACKEND_URL}/health"]`)).toBeVisible();
   });
   
   test('should show channel management section', async ({ page }) => {

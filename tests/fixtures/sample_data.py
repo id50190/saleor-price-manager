@@ -17,7 +17,7 @@ SAMPLE_CHANNELS = [
     },
     {
         "id": "Q2hhbm5lbDoy",
-        "name": "Moscow Store",
+        "name": "Moscow Store", 
         "slug": "moscow",
         "markup_percent": "15",
         "metadata": [{"key": "price_markup_percent", "value": "15"}]

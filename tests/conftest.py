@@ -12,7 +12,7 @@ fake = Faker()
 
 # Override settings for testing
 settings.SALEOR_APP_TOKEN = "test_token"
-settings.REDIS_URL = "redis://localhost:6379/15"  # Test DB
+settings.REDIS_URL = "redis://127.0.0.1:6379/15"  # Test DB
 
 
 @pytest.fixture
@@ -115,16 +115,119 @@ def mock_rust_module():
     return mock
 
 
-@pytest.fixture(autouse=True)
-def mock_dependencies(monkeypatch, mock_redis, mock_saleor_api, mock_rust_module):
+@pytest.fixture
+def mock_httpx_client():
+    """Mock HTTPX client to prevent real HTTP calls"""
+    mock_client = MagicMock()
+    
+    # Mock successful GraphQL responses  
+    async def mock_post(url, **kwargs):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        
+        # Parse GraphQL query to return appropriate response
+        json_data = kwargs.get('json', {})
+        query = json_data.get('query', '')
+        
+        if 'channels' in query.lower() and 'GetChannel' not in query:
+            # List channels query
+            mock_response.json.return_value = {
+                "data": {
+                    "channels": [
+                        {
+                            "id": "Q2hhbm5lbDox",
+                            "name": "Default Channel", 
+                            "slug": "default-channel",
+                            "metadata": [{"key": "price_markup_percent", "value": "0"}]
+                        },
+                        {
+                            "id": "Q2hhbm5lbDoy",
+                            "name": "Moscow Store",
+                            "slug": "moscow", 
+                            "metadata": [{"key": "price_markup_percent", "value": "15"}]
+                        },
+                        {
+                            "id": "Q2hhbm5lbDoz",
+                            "name": "SPb Store",
+                            "slug": "spb",
+                            "metadata": [{"key": "price_markup_percent", "value": "10"}]
+                        }
+                    ]
+                }
+            }
+        elif 'GetChannel' in query or 'channel(' in query.lower():
+            # Single channel query - return different values based on channel ID
+            variables = json_data.get('variables', {})
+            channel_id = variables.get('id', 'Q2hhbm5lbDox')
+            
+            if channel_id == 'Q2hhbm5lbDox':
+                markup_value = "20.5"  # Return expected value for service tests
+            elif channel_id == 'Q2hhbm5lbDoy':
+                markup_value = "15"
+            else:
+                markup_value = "10"
+                
+            mock_response.json.return_value = {
+                "data": {
+                    "channel": {
+                        "id": channel_id,
+                        "name": "Test Channel",
+                        "metadata": [{"key": "price_markup_percent", "value": markup_value}]
+                    }
+                }
+            }
+        elif 'updateMetadata' in query or 'UpdateChannelMetadata' in query:
+            # Update metadata mutation
+            mock_response.json.return_value = {
+                "data": {
+                    "updateMetadata": {
+                        "item": {
+                            "id": "Q2hhbm5lbDox",
+                            "metadata": [{"key": "price_markup_percent", "value": "25.5"}]
+                        },
+                        "errors": []
+                    }
+                }
+            }
+        else:
+            # Default successful response
+            mock_response.json.return_value = {"data": {}}
+            
+        return mock_response
+    
+    mock_client.post = mock_post
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    return mock_client
+
+@pytest.fixture(autouse=True) 
+def mock_dependencies(monkeypatch, mock_redis, mock_saleor_api, mock_rust_module, sample_channels, mock_httpx_client):
     """Auto-mock external dependencies for all tests"""
     # Mock Redis
     monkeypatch.setattr("app.services.markup_service.markup_service.redis", mock_redis)
     
-    # Mock Saleor API functions
+    # Mock HTTPX client at the lowest level - return a class that produces our mock
+    def mock_client_class(**kwargs):
+        return mock_httpx_client
+    
+    monkeypatch.setattr("app.saleor.api.httpx.AsyncClient", mock_client_class)
+    monkeypatch.setattr("httpx.AsyncClient", mock_client_class)
+    
+    # Setup return values for Saleor API mocks (fallback)
+    mock_saleor_api.list_channels.return_value = sample_channels
+    mock_saleor_api.get_channel.return_value = {
+        "id": "Q2hhbm5lbDox", 
+        "metadata": [{"key": "price_markup_percent", "value": "20.5"}]  # Return 20.5 for the service test
+    }
+    mock_saleor_api.update_channel_metadata.return_value = True
+    
+    # Mock Saleor API functions - patch all possible import paths
     monkeypatch.setattr("app.saleor.api.list_channels", mock_saleor_api.list_channels)
     monkeypatch.setattr("app.saleor.api.get_channel", mock_saleor_api.get_channel)
     monkeypatch.setattr("app.saleor.api.update_channel_metadata", mock_saleor_api.update_channel_metadata)
+    
+    # Also mock the client initialization to prevent real API calls
+    monkeypatch.setattr("app.saleor.client.init_saleor_client", AsyncMock())
     
     # Mock Rust module
     monkeypatch.setattr("app.services.price_calculator.price_calculator", mock_rust_module)

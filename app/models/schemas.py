@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from decimal import Decimal
 from typing import List, Optional, Dict, Any
 
@@ -17,17 +17,19 @@ class ChannelMarkup(BaseModel):
         example=15.5
     )
     
-    @validator('markup_percent')
+    @field_validator('markup_percent')
+    @classmethod
     def validate_markup(cls, v):
         return Decimal(round(v, 2))
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "channel_id": "Q2hhbm5lbDox",
                 "markup_percent": 15.5
             }
         }
+    )
 
 class ChannelWithMarkup(BaseModel):
     """Channel information with markup data"""
@@ -40,8 +42,8 @@ class ChannelWithMarkup(BaseModel):
         description="Channel metadata from Saleor"
     )
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "Q2hhbm5lbDox",
                 "name": "Moscow Store",
@@ -52,33 +54,38 @@ class ChannelWithMarkup(BaseModel):
                 ]
             }
         }
+    )
 
 class PriceCalculationRequest(BaseModel):
     """Request model for price calculation"""
     product_id: str = Field(
         ..., 
+        min_length=1,
         description="Base64 encoded Saleor product ID",
         example="UHJvZHVjdDox"
     )
     channel_id: str = Field(
         ..., 
+        min_length=1,
         description="Base64 encoded Saleor channel ID",
         example="Q2hhbm5lbDox"
     )
     base_price: Decimal = Field(
         ..., 
-        description="Base price before markup",
+        gt=0,
+        description="Base price before markup (must be positive)",
         example=100.00
     )
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "product_id": "UHJvZHVjdDox",
                 "channel_id": "Q2hhbm5lbDox",
                 "base_price": 100.00
             }
         }
+    )
 
 class PriceCalculationResponse(BaseModel):
     """Response model for price calculation"""
@@ -89,8 +96,8 @@ class PriceCalculationResponse(BaseModel):
     final_price: str = Field(..., description="Final price after markup")
     currency: str = Field(default="USD", description="Currency code")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "product_id": "UHJvZHVjdDox",
                 "channel_id": "Q2hhbm5lbDox",
@@ -100,6 +107,7 @@ class PriceCalculationResponse(BaseModel):
                 "currency": "USD"
             }
         }
+    )
 
 class SaleorWebhookPayload(BaseModel):
     """Saleor webhook event payload"""
@@ -123,8 +131,8 @@ class SaleorWebhookPayload(BaseModel):
         description="Additional event data from Saleor"
     )
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "event_type": "PRODUCT_UPDATED",
                 "product_id": "UHJvZHVjdDox",
@@ -136,3 +144,4 @@ class SaleorWebhookPayload(BaseModel):
                 }
             }
         }
+    )

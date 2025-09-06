@@ -4,12 +4,21 @@ echo "$0: Starting Saleor Price Manager Frontend at $(date)"
 
 cd "$(dirname "$0")"
 
+# Load environment to get backend configuration
+if [[ -f ".env" ]]; then
+  source .env
+fi
+
 # Check if backend is running
+BACKEND_HOST=${APPLICATION_HOST:-127.0.0.1}
+BACKEND_PORT=${APPLICATION_PORT:-8000}
+BACKEND_URL="http://${BACKEND_HOST}:${BACKEND_PORT}"
+
 echo "Checking backend availability..."
-if curl -s http://localhost:8000/health > /dev/null; then
-  echo "✅ Backend API is running at http://localhost:8000"
+if curl -s "${BACKEND_URL}/health" > /dev/null; then
+  echo "✅ Backend API is running at ${BACKEND_URL}"
 else
-  echo "⚠️ Backend API is not running at http://localhost:8000"
+  echo "⚠️ Backend API is not running at ${BACKEND_URL}"
   echo "   Start the backend first: ./BANG_BACKEND_ONLY"
   read -p "Continue anyway? (y/N): " -n 1 -r
   echo
@@ -34,9 +43,10 @@ fi
 if [[ -f "../.env" ]]; then
   echo "Syncing API configuration..."
   source ../.env
-  API_HOST=${APPLICATION_HOST:-localhost}
-  # Convert 0.0.0.0 to localhost for frontend (browser can't connect to 0.0.0.0)
-  # Keep other hosts (127.0.0.1, specific IPs) as configured
+  API_HOST=${APPLICATION_HOST:-127.0.0.1}
+  # Keep host as-is to match CORS configuration
+  # Host must match exactly what's configured in CORS_ORIGINS
+  # Only convert 0.0.0.0 to localhost as browsers cannot connect to 0.0.0.0
   if [[ "$API_HOST" == "0.0.0.0" ]]; then
     API_HOST="localhost"
   fi
@@ -44,17 +54,19 @@ if [[ -f "../.env" ]]; then
   cat > .env << EOF
 # Auto-generated from backend configuration
 VITE_API_BASE_URL=http://${API_HOST}:${APPLICATION_PORT:-8000}
+VITE_HOST=${APPLICATION_HOST}
+VITE_PORT=${APPLICATION_PORT_FRONTEND:-3000}
 VITE_APP_TITLE="Saleor Price Manager"
 VITE_API_TIMEOUT=10000
 EOF
   
   echo "   Frontend will connect to: http://${API_HOST}:${APPLICATION_PORT:-8000}"
 else
-  echo "   Using default API URL: http://localhost:8000"
+  echo "   Using default API URL: http://127.0.0.1:8000"
 fi
 
 echo "🚀 Starting SvelteKit development server..."
-echo "🌐 Frontend will be available at: http://localhost:3000"
+echo "🌐 Frontend will be available at: http://${APPLICATION_HOST}:${APPLICATION_PORT_FRONTEND:-3000}"
 echo "🚪 Press Ctrl+C to stop"
 echo
 
@@ -63,7 +75,7 @@ export VITE_DISABLE_FS_WATCHER=true
 
 # Start the frontend
 if command -v pnpm &> /dev/null; then
-  pnpm dev
+  pnpm dev --host ${APPLICATION_HOST} --port ${APPLICATION_PORT_FRONTEND:-3000}
 else
-  npm run dev
+  npm run dev -- --host ${APPLICATION_HOST} --port ${APPLICATION_PORT_FRONTEND:-3000}
 fi

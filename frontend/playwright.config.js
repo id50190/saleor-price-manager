@@ -1,5 +1,18 @@
-/** @type {import('@playwright/test').PlaywrightTestConfig} */
-const config = {
+import { defineConfig, devices } from '@playwright/test';
+
+// Get configuration from environment variables
+const APPLICATION_HOST = process.env.APPLICATION_HOST || '127.0.0.1';
+const APPLICATION_PORT_FRONTEND = process.env.APPLICATION_PORT_FRONTEND || '3000';
+const APPLICATION_PORT = process.env.APPLICATION_PORT || '8000';
+
+// Use consistent host configuration
+const FRONTEND_URL = `http://${APPLICATION_HOST}:${APPLICATION_PORT_FRONTEND}`;
+const BACKEND_URL = `http://${APPLICATION_HOST}:${APPLICATION_PORT}`;
+
+/**
+ * @see https://playwright.dev/docs/test-configuration
+ */
+export default defineConfig({
   testDir: './tests',
   timeout: 30 * 1000,
   expect: {
@@ -12,37 +25,35 @@ const config = {
   reporter: 'html',
   use: {
     actionTimeout: 0,
-    baseURL: 'http://localhost:3000',
+    baseURL: FRONTEND_URL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure'
   },
   projects: [
     {
       name: 'chromium',
-      use: { ...require('@playwright/test').devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'firefox', 
-      use: { ...require('@playwright/test').devices['Desktop Firefox'] },
+      use: { ...devices['Desktop Firefox'] },
     },
     {
       name: 'webkit',
-      use: { ...require('@playwright/test').devices['Desktop Safari'] },
+      use: { ...devices['Desktop Safari'] },
     },
     {
       name: 'Mobile Chrome',
-      use: { ...require('@playwright/test').devices['Pixel 5'] },
+      use: { ...devices['Pixel 5'] },
     },
     {
       name: 'Mobile Safari',
-      use: { ...require('@playwright/test').devices['iPhone 12'] },
+      use: { ...devices['iPhone 12'] },
     }
   ],
   webServer: {
-    command: 'npm run preview',
-    port: 3000,
+    command: `npm run dev -- --port ${APPLICATION_PORT_FRONTEND} --host ${APPLICATION_HOST}`,
+    port: parseInt(APPLICATION_PORT_FRONTEND),
     reuseExistingServer: !process.env.CI
   }
-};
-
-module.exports = config;
+});

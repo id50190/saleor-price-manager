@@ -26,8 +26,8 @@ def _python_calculate_price(base_price: str, markup_percent: str) -> str:
     markup_factor = Decimal('1') + (markup / Decimal('100'))
     final_price = base * markup_factor
     
-    # Round to 2 decimal places
-    return str(final_price.quantize(Decimal('0.01')))
+    # Round to 2 decimal places and format consistently
+    return "{:.2f}".format(final_price.quantize(Decimal('0.01')))
 
 async def calculate_price_with_markup(product_id: str, channel_id: str, base_price: Decimal) -> Decimal:
     """
@@ -43,6 +43,8 @@ async def calculate_price_with_markup(product_id: str, channel_id: str, base_pri
             str(base_price), 
             str(markup_percent)
         )
+        # Normalize Rust output format to 2 decimal places
+        final_price = "{:.2f}".format(Decimal(final_price))
     else:
         final_price = _python_calculate_price(
             str(base_price),

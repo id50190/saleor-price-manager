@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+// Get backend URL from environment
+const APPLICATION_HOST = process.env.APPLICATION_HOST || '127.0.0.1';
+const APPLICATION_PORT = process.env.APPLICATION_PORT || '8000';
+const BACKEND_URL = `http://${APPLICATION_HOST}:${APPLICATION_PORT}`;
+
 test.describe('Accessibility Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
@@ -70,11 +75,11 @@ test.describe('Accessibility Tests', () => {
 
   test('links have proper attributes', async ({ page }) => {
     // Check external links have proper attributes
-    const swaggerLink = page.locator('a[href="http://localhost:8000/docs"]');
+    const swaggerLink = page.locator(`a[href="${BACKEND_URL}/docs"]`);
     await expect(swaggerLink).toHaveAttribute('target', '_blank');
     await expect(swaggerLink).toHaveAttribute('rel', 'noopener noreferrer');
     
-    const healthLink = page.locator('a[href="http://localhost:8000/health"]');
+    const healthLink = page.locator(`a[href="${BACKEND_URL}/health"]`);
     await expect(healthLink).toHaveAttribute('target', '_blank');
     await expect(healthLink).toHaveAttribute('rel', 'noopener noreferrer');
   });
