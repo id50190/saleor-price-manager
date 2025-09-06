@@ -21,7 +21,7 @@ fn calculate_price(base_price: String, markup_percent: String) -> PyResult<Strin
 
 /// Массовый расчет цен
 #[pyfunction]
-fn batch_calculate<'p>(py: Python<'p>, items: &PyList) -> PyResult<&'p PyList> {
+fn batch_calculate<'py>(py: Python<'py>, items: Bound<'py, PyList>) -> PyResult<Bound<'py, PyList>> {
     let result = PyList::empty(py);
     
     for item_obj in items.iter() {
@@ -58,7 +58,7 @@ fn batch_calculate<'p>(py: Python<'p>, items: &PyList) -> PyResult<&'p PyList> {
 
 /// Регистрация модуля Python
 #[pymodule]
-fn price_calculator(_py: Python, m: &PyModule) -> PyResult<()> {
+fn price_calculator(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calculate_price, m)?)?;
     m.add_function(wrap_pyfunction!(batch_calculate, m)?)?;
     Ok(())

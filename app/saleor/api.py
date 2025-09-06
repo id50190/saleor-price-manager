@@ -6,9 +6,33 @@ async def get_channel(channel_id: str):
     # Demo-режим для тестирования
     if not settings.SALEOR_APP_TOKEN or settings.SALEOR_APP_TOKEN == "your_saleor_app_token_here":
         demo_channels = {
-            "Q2hhbm5lbDox": {"id": "Q2hhbm5lbDox", "name": "Default Channel", "slug": "default-channel", "metadata": [{"key": "price_markup_percent", "value": "0"}]},
-            "Q2hhbm5lbDoy": {"id": "Q2hhbm5lbDoy", "name": "Moscow Store", "slug": "moscow", "metadata": [{"key": "price_markup_percent", "value": "15"}]},
-            "Q2hhbm5lbDoz": {"id": "Q2hhbm5lbDoz", "name": "SPb Store", "slug": "spb", "metadata": [{"key": "price_markup_percent", "value": "10"}]}
+            "Q2hhbm5lbDox": {
+                "id": "Q2hhbm5lbDox", 
+                "name": "Default Channel", 
+                "slug": "default-channel", 
+                "metadata": [
+                    {"key": "price_markup_percent", "value": "0"},
+                    {"key": "subdomain", "value": "default"}
+                ]
+            },
+            "Q2hhbm5lbDoy": {
+                "id": "Q2hhbm5lbDoy", 
+                "name": "Moscow Store", 
+                "slug": "moscow", 
+                "metadata": [
+                    {"key": "price_markup_percent", "value": "15"},
+                    {"key": "subdomain", "value": "moscow"}
+                ]
+            },
+            "Q2hhbm5lbDoz": {
+                "id": "Q2hhbm5lbDoz", 
+                "name": "SPb Store", 
+                "slug": "spb", 
+                "metadata": [
+                    {"key": "price_markup_percent", "value": "10"},
+                    {"key": "subdomain", "value": "spb"}
+                ]
+            }
         }
         return demo_channels.get(channel_id)
     
@@ -60,19 +84,28 @@ async def list_channels():
                 "id": "Q2hhbm5lbDox", 
                 "name": "Default Channel", 
                 "slug": "default-channel",
-                "metadata": [{"key": "price_markup_percent", "value": "0"}]
+                "metadata": [
+                    {"key": "price_markup_percent", "value": "0"},
+                    {"key": "subdomain", "value": "default"}
+                ]
             },
             {
                 "id": "Q2hhbm5lbDoy", 
                 "name": "Moscow Store", 
                 "slug": "moscow",
-                "metadata": [{"key": "price_markup_percent", "value": "15"}]
+                "metadata": [
+                    {"key": "price_markup_percent", "value": "15"},
+                    {"key": "subdomain", "value": "moscow"}
+                ]
             },
             {
                 "id": "Q2hhbm5lbDoz", 
                 "name": "SPb Store", 
                 "slug": "spb",
-                "metadata": [{"key": "price_markup_percent", "value": "10"}]
+                "metadata": [
+                    {"key": "price_markup_percent", "value": "10"},
+                    {"key": "subdomain", "value": "spb"}
+                ]
             }
         ]
     
@@ -163,3 +196,21 @@ async def get_product_data(product_id: str):
         )
         data = response.json()
         return data.get("data", {}).get("product")
+async def get_channel_by_subdomain(subdomain: str):
+    """Получает канал по поддомену"""
+    # Demo-режим для тестирования
+    if not settings.SALEOR_APP_TOKEN or settings.SALEOR_APP_TOKEN == "your_saleor_app_token_here":
+        channels = await list_channels()
+        for channel in channels:
+            for meta in channel.get("metadata", []):
+                if meta["key"] == "subdomain" and meta["value"] == subdomain:
+                    return channel
+        return None
+    
+    # Для реального Saleor API
+    channels = await list_channels()
+    for channel in channels:
+        for meta in channel.get("metadata", []):
+            if meta["key"] == "subdomain" and meta["value"] == subdomain:
+                return channel
+    return None

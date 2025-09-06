@@ -64,10 +64,10 @@ class PriceCalculationRequest(BaseModel):
         description="Base64 encoded Saleor product ID",
         example="UHJvZHVjdDox"
     )
-    channel_id: str = Field(
-        ..., 
+    channel_id: Optional[str] = Field(
+        None, 
         min_length=1,
-        description="Base64 encoded Saleor channel ID",
+        description="Base64 encoded Saleor channel ID (optional if using subdomain)",
         example="Q2hhbm5lbDox"
     )
     base_price: Decimal = Field(
@@ -86,6 +86,12 @@ class PriceCalculationRequest(BaseModel):
             }
         }
     )
+    
+    @field_validator('channel_id')
+    @classmethod
+    def validate_channel_or_subdomain(cls, v):
+        # Channel ID is optional if subdomain is used via query parameter
+        return v
 
 class PriceCalculationResponse(BaseModel):
     """Response model for price calculation"""

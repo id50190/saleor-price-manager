@@ -60,9 +60,17 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export const api = {
-  async getChannels(): Promise<Channel[]> {
-    const response = await fetch(API_ENDPOINTS.CHANNELS);
+  async getChannels(subdomain?: string): Promise<Channel[]> {
+    const url = subdomain 
+      ? `${API_ENDPOINTS.CHANNELS}?subdomain=${encodeURIComponent(subdomain)}`
+      : API_ENDPOINTS.CHANNELS;
+    const response = await fetch(url);
     return handleResponse<Channel[]>(response);
+  },
+
+  async getChannelBySubdomain(subdomain: string): Promise<Channel | null> {
+    const channels = await this.getChannels(subdomain);
+    return channels.length > 0 ? channels[0] : null;
   },
 
   async updateMarkup(markup: MarkupUpdate): Promise<{ success: boolean; markup: MarkupUpdate }> {
@@ -94,3 +102,23 @@ export const api = {
 };
 
 export { ApiError };
+
+
+// Additional API methods for subdomain support
+export const subdomainApi = {
+  async calculatePriceBySubdomain(
+    productId: string, 
+    basePrice: number, 
+    subdomain: string
+  ): Promise<PriceCalculation> {
+    const url = new URL(`${API_BASE_URL}/api/prices/calculate-by-subdomain`);
+    url.searchParams.set('product_id', productId);
+    url.searchParams.set('base_price', basePrice.toString());
+    url.searchParams.set('subdomain', subdomain);
+    
+    const response = await fetch(url.toString(), {
+      method: 'POST'
+    });
+    return handleResponse<PriceCalculation>(response);
+  }
+};

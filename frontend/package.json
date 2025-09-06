@@ -7,7 +7,6 @@
     "//node": "^22.12 || >=24.7.0",
     "//comment": "Uncomment engines when deploying to production with Node 22+/24.7.0+"
   },
-
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -27,6 +26,7 @@
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
     "@tailwindcss/typography": "^0.5.15",
     "@types/cookie": "^0.6.0",
+    "@types/node": "^24.3.1",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "prettier": "^3.4.2",

@@ -18,8 +18,9 @@ router = APIRouter()
     
     **Parameters:**
     - product_id: Base64 encoded Saleor product ID
-    - channel_id: Base64 encoded Saleor channel ID  
+    - channel_id: Base64 encoded Saleor channel ID (optional if subdomain provided)
     - base_price: Original price before markup
+    - subdomain: Alternative way to specify channel via subdomain (optional)
     
     **Returns:**
     - Detailed price calculation including base price, markup, and final price
@@ -30,27 +31,43 @@ router = APIRouter()
         200: {"description": "Price calculated successfully"},
         400: {"description": "Calculation error"},
         401: {"description": "Authentication required or token invalid"},
+        404: {"description": "Channel not found for subdomain"},
         422: {"description": "Request validation failed"}
     }
 )
-async def calculate_price(request: PriceCalculationRequest):  # Временно убрали аутентификацию для demo
+async def calculate_price(request: PriceCalculationRequest, subdomain: str = None):  # Временно убрали аутентификацию для demo
     """Calculate product price with channel markup"""
     try:
-        markup_percent = await markup_service.get_channel_markup(request.channel_id)
+        channel_id = request.channel_id
+        
+        # Если указан subdomain, ищем канал по нему
+        if subdomain:
+            from app.saleor.api import get_channel_by_subdomain
+            channel = await get_channel_by_subdomain(subdomain)
+            if not channel:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"No channel found for subdomain: {subdomain}"
+                )
+            channel_id = channel["id"]
+        
+        markup_percent = await markup_service.get_channel_markup(channel_id)
         final_price = await calculate_price_with_markup(
             request.product_id,
-            request.channel_id,
+            channel_id,
             request.base_price
         )
         
         return PriceCalculationResponse(
             product_id=request.product_id,
-            channel_id=request.channel_id,
+            channel_id=channel_id,
             base_price=str(request.base_price),
             markup_percent=str(markup_percent),
             final_price=str(final_price),
             currency="USD"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
@@ -109,4 +126,73 @@ async def batch_calculate(items: List[PriceCalculationRequest]):  # Времен
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Batch calculation failed: {str(e)}"
+        )
+
+@router.post(
+    "/calculate-by-subdomain", 
+    response_model=PriceCalculationResponse,
+    summary="Calculate Product Price by Subdomain",
+    description="""Calculate the final price for a product using subdomain to identify the channel.
+    
+    This is a convenience endpoint for frontend applications that use subdomain-based 
+    channel routing (e.g., moscow.yourdomain.com or ?subdomain=moscow).
+    
+    **Formula:** `final_price = base_price * (1 + markup_percent / 100)`
+    
+    **Parameters:**
+    - product_id: Base64 encoded Saleor product ID
+    - base_price: Original price before markup
+    - subdomain: City or region subdomain (e.g., 'moscow', 'spb')
+    
+    **Returns:**
+    - Detailed price calculation including base price, markup, and final price
+    
+    **Authentication:** Bearer token required
+    """,
+    responses={
+        200: {"description": "Price calculated successfully"},
+        400: {"description": "Calculation error"},
+        404: {"description": "Channel not found for subdomain"},
+        422: {"description": "Request validation failed"}
+    }
+)
+async def calculate_price_by_subdomain(
+    product_id: str,
+    base_price: float,
+    subdomain: str
+):
+    """Calculate product price using subdomain to identify channel"""
+    try:
+        from app.saleor.api import get_channel_by_subdomain
+        
+        # Find channel by subdomain
+        channel = await get_channel_by_subdomain(subdomain)
+        if not channel:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No channel found for subdomain: {subdomain}"
+            )
+        
+        channel_id = channel["id"]
+        markup_percent = await markup_service.get_channel_markup(channel_id)
+        final_price = await calculate_price_with_markup(
+            product_id,
+            channel_id,
+            base_price
+        )
+        
+        return PriceCalculationResponse(
+            product_id=product_id,
+            channel_id=channel_id,
+            base_price=str(base_price),
+            markup_percent=str(markup_percent),
+            final_price=str(final_price),
+            currency="USD"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=f"Price calculation failed: {str(e)}"
         )
