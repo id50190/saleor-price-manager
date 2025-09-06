@@ -4,7 +4,7 @@ Hello AI! 👋
 
 Please, do not modify this file!
 
-This repository is a eCommerce web application built with SvelteKit 5 and TailwindCSS based on Saleor API.
+This repository is a eCommerce web application built with SvelteKit 5 and TailwindCSS based on Saleor API, FastAPI.
 
 ## Rules
 
