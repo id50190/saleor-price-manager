@@ -18,14 +18,14 @@
   <div class="api-info">
     <h3 class="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">📡 API Information</h3>
     <div class="space-y-2 text-sm">
-      <p><strong>Backend:</strong> <code class="bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded">{API_BASE_URL}</code></p>
-      <p><strong>Swagger UI:</strong> 
+      <p><strong class="text-gray-900 dark:text-gray-100">Backend:</strong> <code class="bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded text-gray-900 dark:text-gray-100">{API_BASE_URL}</code></p>
+      <p><strong class="text-gray-900 dark:text-gray-100">Swagger UI:</strong> 
         <a href="{API_ENDPOINTS.DOCS}" target="_blank" rel="noopener noreferrer" 
            class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
           {API_ENDPOINTS.DOCS}
         </a>
       </p>
-      <p><strong>Health Check:</strong> 
+      <p><strong class="text-gray-900 dark:text-gray-100">Health Check:</strong> 
         <a href="{API_ENDPOINTS.HEALTH}" target="_blank" rel="noopener noreferrer"
            class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
           {API_ENDPOINTS.HEALTH}

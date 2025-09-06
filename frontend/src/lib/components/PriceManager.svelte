@@ -165,18 +165,18 @@
     <div class="channel-card mt-8 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700">
       <h3 class="text-lg font-semibold text-green-900 dark:text-green-100 mb-4">🧮 Price Calculation Result</h3>
       <div class="space-y-2">
-        <p><strong>Base Price:</strong> <span class="font-mono">${$calculation.base_price}</span></p>
-        <p><strong>Markup:</strong> <span class="font-mono">{$calculation.markup_percent}%</span></p>
-        <p><strong>Final Price:</strong> 
+        <p><strong class="text-gray-900 dark:text-gray-100">Base Price:</strong> <span class="font-mono text-gray-900 dark:text-gray-100">${$calculation.base_price}</span></p>
+        <p><strong class="text-gray-900 dark:text-gray-100">Markup:</strong> <span class="font-mono text-gray-900 dark:text-gray-100">{$calculation.markup_percent}%</span></p>
+        <p><strong class="text-gray-900 dark:text-gray-100">Final Price:</strong> 
           <span class="text-xl font-bold text-primary-600 dark:text-primary-400 font-mono">${$calculation.final_price}</span>
         </p>
-        <p class="text-sm text-gray-600 dark:text-gray-400"><strong>Channel ID:</strong> <code>{$calculation.channel_id}</code></p>
+        <p class="text-sm text-gray-600 dark:text-gray-400"><strong class="text-gray-900 dark:text-gray-100">Channel ID:</strong> <code class="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-1 rounded">{$calculation.channel_id}</code></p>
       </div>
     </div>
   {/if}
   
   <div class="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">
-    <p>💡 <strong>Demo Mode:</strong> Changes are simulated and won't persist</p>
+    <p>💡 <strong class="text-gray-900 dark:text-gray-100">Demo Mode:</strong> Changes are simulated and won't persist</p>
     <p class="mt-2">🔗 
       <a href="{API_ENDPOINTS.DOCS}" target="_blank" rel="noopener noreferrer" 
          class="text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 underline">

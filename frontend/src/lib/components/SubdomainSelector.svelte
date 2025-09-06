@@ -56,6 +56,15 @@
 
 <style>
   .subdomain-selector {
-    @apply mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: rgb(249 250 251);
+    border-radius: 0.5rem;
+    border: 1px solid rgb(229 231 235);
+  }
+  
+  :global(.dark) .subdomain-selector {
+    background-color: rgb(31 41 55 / 0.5);
+    border-color: rgb(55 65 81);
   }
 </style>
