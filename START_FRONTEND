@@ -35,9 +35,9 @@ if [[ -f "../.env" ]]; then
   echo "Syncing API configuration..."
   source ../.env
   API_HOST=${APPLICATION_HOST:-localhost}
-  # Convert 0.0.0.0 to localhost for frontend (browser can't connect to 0.0.0.0)
-  # Keep other hosts (127.0.0.1, specific IPs) as configured
-  if [[ "$API_HOST" == "0.0.0.0" ]]; then
+  # Convert local addresses to localhost for frontend (browser compatibility)
+  # Both 0.0.0.0 and 127.0.0.1 should become localhost for browser access
+  if [[ "$API_HOST" == "0.0.0.0" ]] || [[ "$API_HOST" == "127.0.0.1" ]]; then
     API_HOST="localhost"
   fi
   
