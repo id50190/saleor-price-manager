@@ -45,6 +45,8 @@ if [[ -f "../.env" ]]; then
   cat > .env << EOF
 # Auto-generated from backend configuration
 VITE_API_BASE_URL=http://${API_HOST}:${APPLICATION_PORT:-8000}
+VITE_HOST=${APPLICATION_HOST}
+VITE_PORT=${APPLICATION_PORT_FRONTEND:-3000}
 VITE_APP_TITLE="Saleor Price Manager"
 VITE_API_TIMEOUT=10000
 EOF
@@ -55,7 +57,7 @@ else
 fi
 
 echo "🚀 Starting SvelteKit development server..."
-echo "🌐 Frontend will be available at: http://localhost:${APPLICATION_PORT_FRONTEND:-3000}"
+echo "🌐 Frontend will be available at: http://${APPLICATION_HOST}:${APPLICATION_PORT_FRONTEND:-3000}"
 echo "🚪 Press Ctrl+C to stop"
 echo
 

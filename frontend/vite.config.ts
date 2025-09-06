@@ -4,8 +4,8 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	plugins: [sveltekit()],
 	server: {
-		port: 3000,
-		host: '0.0.0.0',
+		port: parseInt(process.env.VITE_PORT || '3000'),
+		host: process.env.VITE_HOST || '0.0.0.0',
 		fs: {
 			// Reduce file watching to prevent OS limits
 			allow: ['..', '.']
