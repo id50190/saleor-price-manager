@@ -158,12 +158,16 @@ if [[ "$START_FRONTEND" == "true" ]]; then
     cd ..
   fi
   
-  # Start frontend in background
+  # Start frontend in background with optimized settings
   cd frontend
+  
+  # Set reduced file watching to prevent OS limits
+  export VITE_DISABLE_FS_WATCHER=true
+  
   if command -v pnpm &> /dev/null; then
-    pnpm dev -- --port 3000 --host 0.0.0.0 &
+    pnpm dev &
   else
-    npm run dev -- --port 3000 --host 0.0.0.0 &
+    npm run dev &
   fi
   FRONTEND_PID=$!
   cd ..
