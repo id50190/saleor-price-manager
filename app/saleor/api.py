@@ -75,3 +75,38 @@ async def update_channel_metadata(channel_id: str, metadata: list):
         )
         data = response.json()
         return not data.get("data", {}).get("updateMetadata", {}).get("errors")
+
+async def get_product_data(product_id: str):
+    """Получает данные продукта из Saleor"""
+    query = """
+    query GetProduct($id: ID!) {
+        product(id: $id) {
+            id
+            name
+            slug
+            variants {
+                id
+                name
+                channelListings {
+                    channel {
+                        id
+                        name
+                        slug
+                    }
+                    price {
+                        amount
+                        currency
+                    }
+                }
+            }
+        }
+    }
+    """
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            settings.SALEOR_API_URL,
+            json={"query": query, "variables": {"id": product_id}},
+            headers={"Authorization": f"Bearer {settings.SALEOR_APP_TOKEN}"}
+        )
+        data = response.json()
+        return data.get("data", {}).get("product")

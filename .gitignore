@@ -5,3 +5,8 @@ env/
 .DS_Store
 desktop.ini
 __pycache__/*
+# Testing
+venv/
+requirements-test.txt
+__pycache__/
+*.pyc
