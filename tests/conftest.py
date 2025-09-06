@@ -116,15 +116,26 @@ def mock_rust_module():
 
 
 @pytest.fixture(autouse=True)
-def mock_dependencies(monkeypatch, mock_redis, mock_saleor_api, mock_rust_module):
+def mock_dependencies(monkeypatch, mock_redis, mock_saleor_api, mock_rust_module, sample_channels):
     """Auto-mock external dependencies for all tests"""
     # Mock Redis
     monkeypatch.setattr("app.services.markup_service.markup_service.redis", mock_redis)
     
-    # Mock Saleor API functions
+    # Setup return values for Saleor API mocks
+    mock_saleor_api.list_channels.return_value = sample_channels
+    mock_saleor_api.get_channel.return_value = {
+        "id": "Q2hhbm5lbDox",
+        "metadata": [{"key": "price_markup_percent", "value": "0"}]
+    }
+    mock_saleor_api.update_channel_metadata.return_value = True
+    
+    # Mock Saleor API functions - patch all possible import paths
     monkeypatch.setattr("app.saleor.api.list_channels", mock_saleor_api.list_channels)
     monkeypatch.setattr("app.saleor.api.get_channel", mock_saleor_api.get_channel)
     monkeypatch.setattr("app.saleor.api.update_channel_metadata", mock_saleor_api.update_channel_metadata)
+    
+    # Also mock the client initialization to prevent real API calls
+    monkeypatch.setattr("app.saleor.client.init_saleor_client", AsyncMock())
     
     # Mock Rust module
     monkeypatch.setattr("app.services.price_calculator.price_calculator", mock_rust_module)

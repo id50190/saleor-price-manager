@@ -1,4 +1,5 @@
 import time
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response, Query 
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,13 +10,22 @@ from app.api import channels, prices, webhooks
 from app.core.config import settings
 from app.saleor.client import init_saleor_client
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await init_saleor_client()
+    yield
+    # Shutdown - можно добавить cleanup логику если нужно
+    pass
+
 app = FastAPI(
   title='Saleor Price Manager',
   description='FastAPI service for managing dynamic pricing across multiple Saleor channels with percentage-based markups and Redis caching',
   version='1.0.0',
   docs_url='/docs',                   # Путь для Swagger UI
   redoc_url='/redoc',                 # Путь для ReDoc
-  openapi_url='/api/v1/openapi.json') # Путь для OpenAPI-схемы
+  openapi_url='/api/v1/openapi.json', # Путь для OpenAPI-схемы
+  lifespan=lifespan)
 
 # Middleware
 app.add_middleware(
@@ -33,11 +43,6 @@ async def add_process_time_header(request: Request, call_next):
   if request.query_params.__contains__('set-process-time'):
     response.headers['X-Process-Time'] = str(process_time)
   return response
-
-# Startup event
-@app.on_event('startup')
-async def startup_event():
-  await init_saleor_client()
 
 # Include routers
 app.include_router(channels.router, prefix='/api/channels', tags=['channels'])
