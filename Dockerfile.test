@@ -1,0 +1,52 @@
+# Test environment Dockerfile
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements*.txt ./
+
+# Install Python dependencies
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install -r requirements.txt
+RUN pip install -r requirements-dev.txt
+
+# Copy Rust module
+COPY rust_modules/ ./rust_modules/
+
+# Build Rust module
+RUN cd rust_modules/price_calculator && \
+    cargo build --release && \
+    pip install maturin && \
+    maturin develop --release
+
+# Copy application code
+COPY app/ ./app/
+COPY main.py ./
+COPY pytest.ini ./
+
+# Copy test files
+COPY tests/ ./tests/
+
+# Create test environment file
+RUN echo 'APP_URL=http://localhost:8000' > .env.test && \
+    echo 'APP_FRONTEND_URL=http://localhost:3000' >> .env.test && \
+    echo 'SALEOR_API_URL=https://test.saleor.cloud/graphql/' >> .env.test && \
+    echo 'REDIS_URL=redis://redis-test:6379/0' >> .env.test && \
+    echo 'SALEOR_APP_TOKEN=test_token' >> .env.test && \
+    echo 'DEBUG=true' >> .env.test
+
+# Default command runs tests
+CMD ["pytest", "tests/", "--verbose", "--cov=app", "--cov-report=html:htmlcov", "--cov-report=term-missing"]

@@ -1,0 +1,171 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop, sketch-wip ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:7.0
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    
+    - name: Cache Python dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+    
+    - name: Build Rust module
+      run: |
+        cd rust_modules/price_calculator
+        cargo build --release
+        pip install maturin
+        maturin develop --release
+        cd ../..
+    
+    - name: Run API tests
+      run: |
+        pytest tests/api/ --verbose --cov=app --cov-report=xml --cov-report=term-missing
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: api-tests
+        name: codecov-umbrella
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Set up Python for backend
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    
+    - name: Install backend dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Build Rust module
+      run: |
+        cd rust_modules/price_calculator
+        cargo build --release
+        pip install maturin
+        maturin develop --release
+        cd ../..
+    
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+        npx playwright install --with-deps
+    
+    - name: Run frontend tests
+      run: |
+        cd frontend
+        npx playwright test --reporter=github
+    
+    - name: Upload Playwright report
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: playwright-report
+        path: frontend/playwright-report/
+        retention-days: 30
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: [api-tests, frontend-tests]
+    
+    services:
+      redis:
+        image: redis:7.0
+        ports:
+          - 6379:6379
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    
+    - name: Deploy application
+      run: |
+        ./DEPLOY
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/api/test_integration.py -m integration --verbose
+    
+    - name: Test application startup
+      run: |
+        timeout 30s ./BANG &
+        sleep 10
+        curl -f http://localhost:8000/health
+        curl -f http://localhost:8000/api/channels/

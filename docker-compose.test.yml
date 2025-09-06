@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # Test database
+  redis-test:
+    image: redis:7.0-alpine
+    ports:
+      - "6380:6379"
+    command: redis-server --save "" --appendonly no  # No persistence for tests
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # API service for testing
+  api-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://redis-test:6379/0
+      - SALEOR_API_URL=https://test.saleor.cloud/graphql/
+      - SALEOR_APP_TOKEN=test_token
+      - DEBUG=true
+    ports:
+      - "8001:8000"
+    depends_on:
+      redis-test:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Frontend service for testing
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.test
+    environment:
+      - REACT_APP_API_URL=http://api-test:8000
+      - CI=true
+    ports:
+      - "3001:3000"
+    depends_on:
+      api-test:
+        condition: service_healthy
+
+  # Test runner service
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      - REDIS_URL=redis://redis-test:6379/0
+      - API_BASE_URL=http://api-test:8000
+      - FRONTEND_BASE_URL=http://frontend-test:3000
+    volumes:
+      - ./tests:/app/tests
+      - ./htmlcov:/app/htmlcov
+      - ./frontend/playwright-report:/app/frontend/playwright-report
+    depends_on:
+      api-test:
+        condition: service_healthy
+      frontend-test:
+        condition: service_started
+    profiles:
+      - test
+
+  # Playwright test runner
+  playwright-runner:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.playwright
+    environment:
+      - API_BASE_URL=http://api-test:8000
+      - FRONTEND_BASE_URL=http://frontend-test:3000
+    volumes:
+      - ./frontend/tests:/app/tests
+      - ./frontend/playwright-report:/app/playwright-report
+    depends_on:
+      api-test:
+        condition: service_healthy
+      frontend-test:
+        condition: service_started
+    profiles:
+      - e2e

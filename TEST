@@ -1,39 +1,202 @@
-#!/bin/bash
+#!/usr/bin/bash
 
-echo '🧪 Testing deployment workflow...'
+echo "$0: Testing Saleor Price Manager at $(date)"
 
-echo '📦 Step 1: Checking executable permissions'
-if [[ -x ./DEPLOY && -x ./BANG && -x ./BUILD ]]; then
-  echo '✅ All scripts are executable'
-else 
-  echo '❌ Some scripts are not executable'
-  exit 1
-fi
+# ==============================================================================
+# ⚙️ S E T T I N G S
+# ==============================================================================
 
-echo '📋 Step 2: Checking for required files'
-REQUIRED_FILES=('main.py' 'requirements.txt' 'rust_modules/price_calculator/Cargo.toml' 'app/core/config.py')
-for file in "${REQUIRED_FILES[@]}"; do
-  if [[ -f $file ]]; then
-    echo "✅ Found: $file"
-  else
-    echo "❌ Missing: $file"
+set -eu || set -o errexit && set -o nounset; set -o pipefail; set +o history
+
+cd "$(dirname "$0")"
+DIVIDER="$(printf '=%.0s' {1..80})" && div() { echo "$DIVIDER"; }
+error_code=1
+ending="Testing completed."
+
+abort() {
+  ending="$1"
+  exit ${2:-1}
+}
+
+cadence() {
+  set +eu || set +o errexit && set +o nounset; set +o pipefail; set -o history
+  [[ $error_code -ne 0 && "$ending" == "Testing completed." ]] && ending='Testing failed!'
+  [[ -v ending && ! -z "$ending" ]] && echo "$0: $ending"
+}; trap cadence EXIT
+
+# Parse command line arguments
+TEST_TYPE=${1:-all}  # all, api, frontend, quick
+
+# ==============================================================================
+# 📝 Q U I C K  C H E C K S
+# ==============================================================================
+
+if [[ "$TEST_TYPE" == "quick" || "$TEST_TYPE" == "all" ]]; then
+  echo '🚀 Running quick deployment checks...'
+  div
+  
+  echo '📚 Step 1: Checking executable permissions'
+  if [[ -x ./DEPLOY && -x ./BANG && -x ./BUILD && -x ./START_FRONTEND ]]; then
+    echo '✅ All scripts are executable'
+  else 
+    echo '❌ Some scripts are not executable'
     exit 1
   fi
-done
-
-echo '🐍 Step 3: Checking Python version'
-if command -v python3 &> /dev/null; then
-  PYTHON_VERSION=$(python3 --version | cut -d" " -f2 | cut -d"." -f1,2)
-  echo "✅ Python version: $PYTHON_VERSION"
-else
-  echo '❌ Python3 not found'
-  exit 1
+  
+  echo '📋 Step 2: Checking for required files'
+  REQUIRED_FILES=('main.py' 'requirements.txt' 'rust_modules/price_calculator/Cargo.toml' 'app/core/config.py' 'frontend/package.json')
+  for file in "${REQUIRED_FILES[@]}"; do
+    if [[ -f $file ]]; then
+      echo "✅ Found: $file"
+    else
+      echo "❌ Missing: $file"
+      exit 1
+    fi
+  done
+  
+  echo '🐍 Step 3: Checking Python version'
+  if command -v python3 &> /dev/null; then
+    PYTHON_VERSION=$(python3 --version | cut -d" " -f2 | cut -d"." -f1,2)
+    echo "✅ Python version: $PYTHON_VERSION"
+  else
+    echo '❌ Python3 not found'
+    exit 1
+  fi
+  
+  echo '🔧 Step 4: Checking Node.js version'
+  if command -v node &> /dev/null; then
+    NODE_VERSION=$(node --version)
+    echo "✅ Node.js version: $NODE_VERSION"
+  else
+    echo '⚠️ Node.js not found (required for frontend)'
+  fi
+  
+  echo '✅ Quick checks passed!'
+  
+  if [[ "$TEST_TYPE" == "quick" ]]; then
+    error_code=0
+    exit 0
+  fi
 fi
 
-echo '🎉 All checks passed! Ready for deployment.'
-echo ''
-echo '📖 Next steps:'
-echo '   1. Run ./DEPLOY to set up the environment'
-echo '   2. Edit .env file with your configuration'
-echo '   3. Run ./BANG to start the application'
+# ==============================================================================
+# 🧪 A P I  T E S T S  (Backend with pytest)
+# ==============================================================================
 
+if [[ "$TEST_TYPE" == "api" || "$TEST_TYPE" == "all" ]]; then
+  echo '🧪 Running API tests with pytest...'
+  div
+  
+  # Check if virtual environment exists
+  if [[ ! -d ./env ]]; then
+    echo '⚠️ Virtual environment not found. Running deployment first...'
+    ./DEPLOY
+  fi
+  
+  # Activate virtual environment
+  source env/bin/activate
+  
+  # Install test dependencies
+  echo 'Installing test dependencies...'
+  pip install -r requirements-dev.txt
+  
+  # Run API tests
+  echo 'Running pytest with coverage...'
+  pytest tests/api/ --verbose --cov=app --cov-report=term-missing --cov-report=html:htmlcov
+  
+  API_TEST_EXIT_CODE=$?
+  
+  deactivate
+  
+  if [[ $API_TEST_EXIT_CODE -ne 0 ]]; then
+    abort 'API tests failed!'
+  fi
+  
+  echo '✅ API tests passed!'
+fi
+
+# ==============================================================================
+# 🌐 F R O N T E N D  T E S T S  (Browser with Playwright)
+# ==============================================================================
+
+if [[ "$TEST_TYPE" == "frontend" || "$TEST_TYPE" == "all" ]]; then
+  echo '🌐 Running frontend E2E tests with Playwright...'
+  div
+  
+  cd frontend
+  
+  # Install dependencies if needed
+  if [[ ! -d node_modules ]]; then
+    echo 'Installing frontend dependencies...'
+    if command -v pnpm &> /dev/null; then
+      pnpm install
+    else
+      npm install
+    fi
+  fi
+  
+  # Install Playwright browsers
+  if [[ ! -d node_modules/@playwright/test ]]; then
+    echo 'Installing Playwright...'
+    if command -v pnpm &> /dev/null; then
+      pnpm add -D @playwright/test
+    else
+      npm install --save-dev @playwright/test
+    fi
+  fi
+  
+  # Install Playwright browsers
+  echo 'Installing Playwright browsers...'
+  npx playwright install
+  
+  # Run frontend tests
+  echo 'Running Playwright E2E tests...'
+  npx playwright test --reporter=line
+  
+  FRONTEND_TEST_EXIT_CODE=$?
+  
+  cd ..
+  
+  if [[ $FRONTEND_TEST_EXIT_CODE -ne 0 ]]; then
+    abort 'Frontend tests failed!'
+  fi
+  
+  echo '✅ Frontend tests passed!'
+fi
+
+# ==============================================================================
+# 📋 T E S T  S U M M A R Y
+# ==============================================================================
+
+echo 'Test Summary:'
+div
+
+if [[ "$TEST_TYPE" == "all" ]]; then
+  echo '✅ Quick deployment checks: PASSED'
+  echo '✅ API tests (pytest with mocks): PASSED'
+  echo '✅ Frontend tests (Playwright E2E): PASSED'
+  echo ''
+  echo '📈 Coverage reports:'
+  echo '   API Coverage: htmlcov/index.html'
+  echo '   Frontend Report: frontend/playwright-report/index.html'
+elif [[ "$TEST_TYPE" == "api" ]]; then
+  echo '✅ API tests (pytest with mocks): PASSED'
+  echo '📈 API Coverage: htmlcov/index.html'
+elif [[ "$TEST_TYPE" == "frontend" ]]; then
+  echo '✅ Frontend tests (Playwright E2E): PASSED'
+  echo '📈 Frontend Report: frontend/playwright-report/index.html'
+elif [[ "$TEST_TYPE" == "quick" ]]; then
+  echo '✅ Quick deployment checks: PASSED'
+fi
+
+echo ''
+echo '🎆 All tests completed successfully!'
+echo ''
+echo '🚀 Usage:'
+echo '   ./TEST           # Run all tests (quick + api + frontend)'
+echo '   ./TEST quick     # Run only quick deployment checks'
+echo '   ./TEST api       # Run only API tests with pytest'
+echo '   ./TEST frontend  # Run only frontend E2E tests with Playwright'
+
+error_code=0
+exit $error_code
