@@ -4,7 +4,7 @@ class Settings(BaseSettings):
     APP_URL: str
     APP_FRONTEND_URL: str
     SALEOR_API_URL: str
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str = "redis://127.0.0.1:6379/0"
     CORS_ORIGINS: list = []
     SALEOR_APP_TOKEN: str = ""  # Токен для авторизации в Saleor
     

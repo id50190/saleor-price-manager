@@ -1,11 +1,31 @@
 import { dev } from '$app/environment';
 
 // API Configuration - respect exact environment configuration
-export const API_BASE_URL = 
-  import.meta.env.VITE_API_BASE_URL || 
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-    ? `http://${window.location.hostname}:8000`  // Production/deployed
-    : 'http://localhost:8000');  // Fallback
+// Priority: VITE_API_BASE_URL > constructed from APPLICATION_HOST > fallback to current hostname
+const getApiBaseUrl = () => {
+  // First priority: explicit API URL override
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  
+  // Second priority: use APPLICATION_HOST if available
+  const host = import.meta.env.VITE_APPLICATION_HOST || '127.0.0.1';
+  const port = import.meta.env.VITE_APPLICATION_PORT || '8000';
+  
+  // On client side, use configured host unless it's a bind-all address
+  if (typeof window !== 'undefined') {
+    if (host === '0.0.0.0' || host === '::') {
+      // If backend binds to all interfaces, use current hostname for client
+      return `http://${window.location.hostname}:${port}`;
+    }
+    return `http://${host}:${port}`;
+  }
+  
+  // Server-side rendering fallback
+  return `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}`;
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 // App Configuration
 export const APP_CONFIG = {
