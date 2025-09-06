@@ -1,5 +1,9 @@
-/** @type {import('@playwright/test').PlaywrightTestConfig} */
-const config = {
+import { defineConfig, devices } from '@playwright/test';
+
+/**
+ * @see https://playwright.dev/docs/test-configuration
+ */
+export default defineConfig({
   testDir: './tests',
   timeout: 30 * 1000,
   expect: {
@@ -12,37 +16,35 @@ const config = {
   reporter: 'html',
   use: {
     actionTimeout: 0,
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://127.0.0.1:3000',  // Use consistent host
     trace: 'on-first-retry',
     screenshot: 'only-on-failure'
   },
   projects: [
     {
       name: 'chromium',
-      use: { ...require('@playwright/test').devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'firefox', 
-      use: { ...require('@playwright/test').devices['Desktop Firefox'] },
+      use: { ...devices['Desktop Firefox'] },
     },
     {
       name: 'webkit',
-      use: { ...require('@playwright/test').devices['Desktop Safari'] },
+      use: { ...devices['Desktop Safari'] },
     },
     {
       name: 'Mobile Chrome',
-      use: { ...require('@playwright/test').devices['Pixel 5'] },
+      use: { ...devices['Pixel 5'] },
     },
     {
       name: 'Mobile Safari',
-      use: { ...require('@playwright/test').devices['iPhone 12'] },
+      use: { ...devices['iPhone 12'] },
     }
   ],
   webServer: {
-    command: 'npm run preview',
+    command: 'npm run dev -- --port 3000 --host 127.0.0.1',
     port: 3000,
     reuseExistingServer: !process.env.CI
   }
-};
-
-module.exports = config;
+});
