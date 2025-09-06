@@ -3,6 +3,9 @@ import { browser } from '$app/environment';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
+// Note: Using traditional stores for broader compatibility
+// Can be migrated to runes ($state) when fully on Node 22+/24+
+
 // Create theme store with initial value from localStorage or system preference
 function createThemeStore() {
   // Default to system theme

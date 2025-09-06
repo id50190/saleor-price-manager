@@ -3,7 +3,8 @@
 ## 🎯 **Completed Migration**
 
 ### **Architecture Changes**
-- ✅ **React 18** → **SvelteKit 4** (compatible with Node 18.19)
+- ✅ **React 18** → **SvelteKit 2.37 + Svelte 5.38** (production: Node 22.x/24.7.0+)
+- ✅ **Compatible syntax** for development + **runes ready** for production
 - ✅ **JavaScript** → **TypeScript** (strict mode)
 - ✅ **Inline CSS** → **TailwindCSS** with custom design system
 - ✅ **Create React App** → **Vite** (faster builds)

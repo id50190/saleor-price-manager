@@ -1,6 +1,10 @@
 <script lang="ts">
   import { themeMode, type ThemeMode } from '$lib/stores/theme';
-
+  
+  // Svelte 5 ready: Can use runes when fully on Node 22+/24+
+  // let isOpen = $state(false);
+  // For now, using traditional syntax for compatibility
+  
   const themes: { mode: ThemeMode; icon: string; label: string }[] = [
     { mode: 'light', icon: '☀️', label: 'Light' },
     { mode: 'dark', icon: '🌙', label: 'Dark' },

@@ -248,6 +248,21 @@ See [PRODUCTION.md](PRODUCTION.md) for detailed production deployment guide incl
 
 ---
 
+## 📋 System Requirements
+
+### Development Environment
+- **Python**: 3.11+ 
+- **Node.js**: 18+ (current development setup)
+- **Rust**: latest (installed automatically)
+- **Redis**: 7.0+ (optional for caching)
+
+### Production Deployment
+- **Node.js**: **22.x (LTS)** or **24.7.0+** (required for SvelteKit 5)
+- **Platform Support**: Vercel, Docker, Ubuntu LTS
+- **See**: `frontend/PRODUCTION_DEPLOYMENT.md` for detailed guide
+
+---
+
 ## 🛠️ Troubleshooting
 
 ### Common Issues
