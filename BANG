@@ -182,9 +182,9 @@ EOF
   export VITE_DISABLE_FS_WATCHER=true
   
   if command -v pnpm &> /dev/null; then
-    pnpm dev &
+    pnpm dev --host ${APPLICATION_HOST} --port ${APPLICATION_PORT_FRONTEND:-3000} &
   else
-    npm run dev &
+    npm run dev -- --host ${APPLICATION_HOST} --port ${APPLICATION_PORT_FRONTEND:-3000} &
   fi
   FRONTEND_PID=$!
   cd ..
