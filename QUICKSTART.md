@@ -116,6 +116,26 @@ source $HOME/.cargo/env
 ./BUILD
 ```
 
+### Ошибка "Both VIRTUAL_ENV and CONDA_PREFIX are set":
+```bash
+# Временно отключите conda
+conda deactivate
+# Или удалите CONDA_PREFIX
+unset CONDA_PREFIX
+# Затем запустите сборку
+./BUILD
+```
+
+### Maturin не может найти виртуальное окружение:
+```bash
+# Убедитесь что виртуальное окружение создано
+./DEPLOY
+# Активируйте окружение и пересоберите
+source env/bin/activate
+./BUILD
+deactivate
+```
+
 ### Проблемы с зависимостями Python:
 ```bash
 # Очистка и пересоздание окружения

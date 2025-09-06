@@ -34,6 +34,11 @@ if ! command -v cargo &> /dev/null; then
   source "$HOME/.cargo/env"
 fi
 
+# Ensure Rust is in PATH
+if [[ -f "$HOME/.cargo/env" ]]; then
+  source "$HOME/.cargo/env"
+fi
+
 echo "🦀 Rust version: $(rustc --version)"
 echo "📦 Cargo version: $(cargo --version)"
 
@@ -45,6 +50,18 @@ cargo build --release
 
 echo "Installing Python module with maturin..."
 pip install maturin
+
+# Clear conflicting environment variables for maturin
+if [[ -n "${CONDA_PREFIX:-}" ]]; then
+  echo "🧹 Clearing CONDA_PREFIX to avoid conflicts with maturin"
+  unset CONDA_PREFIX
+fi
+
+# Ensure VIRTUAL_ENV is set correctly
+export VIRTUAL_ENV="$(cd ../../env && pwd)"
+echo "🐍 Using virtual environment: $VIRTUAL_ENV"
+
+echo "🔧 Running maturin develop..."
 maturin develop --release
 
 cd ../../
