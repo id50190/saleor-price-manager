@@ -1,10 +1,11 @@
 import { dev } from '$app/environment';
 
-// API Configuration
+// API Configuration - respect exact environment configuration
 export const API_BASE_URL = 
-  typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+  import.meta.env.VITE_API_BASE_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
     ? `http://${window.location.hostname}:8000`  // Production/deployed
-    : import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';  // Development
+    : 'http://localhost:8000');  // Fallback
 
 // App Configuration
 export const APP_CONFIG = {

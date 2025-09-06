@@ -161,8 +161,9 @@ if [[ "$START_FRONTEND" == "true" ]]; then
   # Sync backend host/port to frontend environment
   echo "Syncing API configuration to frontend..."
   API_HOST=${APPLICATION_HOST}
-  # Convert 0.0.0.0 and 127.0.0.1 to localhost for frontend
-  if [[ "$API_HOST" == "0.0.0.0" ]] || [[ "$API_HOST" == "127.0.0.1" ]]; then
+  # Convert 0.0.0.0 to localhost for frontend (browser can't connect to 0.0.0.0)
+  # Keep 127.0.0.1 as is for consistency with backend
+  if [[ "$API_HOST" == "0.0.0.0" ]]; then
     API_HOST="localhost"
   fi
   
