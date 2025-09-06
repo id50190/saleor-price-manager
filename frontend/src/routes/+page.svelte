@@ -1,5 +1,6 @@
 <script lang="ts">
   import PriceManager from '$lib/components/PriceManager.svelte';
+  import { API_BASE_URL, API_ENDPOINTS } from '$lib/config';
 </script>
 
 <svelte:head>
@@ -17,17 +18,17 @@
   <div class="api-info">
     <h3 class="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">📡 API Information</h3>
     <div class="space-y-2 text-sm">
-      <p><strong>Backend:</strong> <code class="bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded">http://localhost:8000</code></p>
+      <p><strong>Backend:</strong> <code class="bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded">{API_BASE_URL}</code></p>
       <p><strong>Swagger UI:</strong> 
-        <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer" 
+        <a href="{API_ENDPOINTS.DOCS}" target="_blank" rel="noopener noreferrer" 
            class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
-          http://localhost:8000/docs
+          {API_ENDPOINTS.DOCS}
         </a>
       </p>
       <p><strong>Health Check:</strong> 
-        <a href="http://localhost:8000/health" target="_blank" rel="noopener noreferrer"
+        <a href="{API_ENDPOINTS.HEALTH}" target="_blank" rel="noopener noreferrer"
            class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
-          http://localhost:8000/health
+          {API_ENDPOINTS.HEALTH}
         </a>
       </p>
     </div>

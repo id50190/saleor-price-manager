@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api, type Channel, type PriceCalculation } from '$lib/api/client';
   import { channels, loading, error, calculation } from '$lib/stores/channels';
+  import { API_BASE_URL, API_ENDPOINTS } from '$lib/config';
   import ChannelCard from './ChannelCard.svelte';
   import LoadingSpinner from './LoadingSpinner.svelte';
   import ErrorMessage from './ErrorMessage.svelte';
@@ -74,7 +75,7 @@
   {:else if $error}
     <ErrorMessage message={$error}>
       <div class="mt-4">
-        <p class="text-sm text-gray-600 dark:text-gray-400">Make sure the FastAPI backend is running on http://localhost:8000</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400">Make sure the FastAPI backend is running on {API_BASE_URL}</p>
         <button 
           on:click={fetchChannels}
           class="mt-2 px-4 py-2 bg-primary-500 dark:bg-primary-600 text-white rounded-md hover:bg-primary-600 dark:hover:bg-primary-700 transition-colors"
@@ -115,7 +116,7 @@
   <div class="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">
     <p>💡 <strong>Demo Mode:</strong> Changes are simulated and won't persist</p>
     <p class="mt-2">🔗 
-      <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer" 
+      <a href="{API_ENDPOINTS.DOCS}" target="_blank" rel="noopener noreferrer" 
          class="text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 underline">
         Open API Documentation
       </a>

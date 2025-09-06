@@ -158,6 +158,23 @@ if [[ "$START_FRONTEND" == "true" ]]; then
     cd ..
   fi
   
+  # Sync backend host/port to frontend environment
+  echo "Syncing API configuration to frontend..."
+  API_HOST=${APPLICATION_HOST}
+  # Convert 0.0.0.0 and 127.0.0.1 to localhost for frontend
+  if [[ "$API_HOST" == "0.0.0.0" ]] || [[ "$API_HOST" == "127.0.0.1" ]]; then
+    API_HOST="localhost"
+  fi
+  
+  cat > frontend/.env << EOF
+# Auto-generated from backend configuration
+VITE_API_BASE_URL=http://${API_HOST}:${APPLICATION_PORT}
+VITE_APP_TITLE="Saleor Price Manager"
+VITE_API_TIMEOUT=10000
+EOF
+  
+  echo "   Frontend will connect to: http://${API_HOST}:${APPLICATION_PORT}"
+  
   # Start frontend in background with optimized settings
   cd frontend
   

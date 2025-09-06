@@ -1,4 +1,6 @@
-const API_BASE_URL = 'http://localhost:8000';
+import { API_BASE_URL, API_ENDPOINTS } from '$lib/config';
+
+// Use centralized configuration
 
 export interface Channel {
   id: string;
@@ -59,12 +61,12 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 export const api = {
   async getChannels(): Promise<Channel[]> {
-    const response = await fetch(`${API_BASE_URL}/api/channels/`);
+    const response = await fetch(API_ENDPOINTS.CHANNELS);
     return handleResponse<Channel[]>(response);
   },
 
   async updateMarkup(markup: MarkupUpdate): Promise<{ success: boolean; markup: MarkupUpdate }> {
-    const response = await fetch(`${API_BASE_URL}/api/channels/markup`, {
+    const response = await fetch(API_ENDPOINTS.CHANNEL_MARKUP, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -75,7 +77,7 @@ export const api = {
   },
 
   async calculatePrice(request: PriceCalculationRequest): Promise<PriceCalculation> {
-    const response = await fetch(`${API_BASE_URL}/api/prices/calculate`, {
+    const response = await fetch(API_ENDPOINTS.PRICE_CALCULATE, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -86,7 +88,7 @@ export const api = {
   },
 
   async healthCheck(): Promise<{ status: string }> {
-    const response = await fetch(`${API_BASE_URL}/health`);
+    const response = await fetch(API_ENDPOINTS.HEALTH);
     return handleResponse<{ status: string }>(response);
   }
 };
