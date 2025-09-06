@@ -16,7 +16,7 @@ set -eu || set -o errexit && set -o nounset; set -o pipefail; set +o history
 
 cd "$(dirname "$0")" && SCRIPT_DIR="$(pwd)"
 DIVIDER="$(printf '=%.0s' {1..80})" && div() {
-  if [[ ! -z "$1" ]]; then echo "$(printf "$1"'%.0s' {1..80})"
+  if [[ $# -gt 0 && ! -z "${1:-}" ]]; then echo "$(printf "$1"'%.0s' {1..80})"
   else echo "$DIVIDER"; fi
 }
 VERBOSE=true
