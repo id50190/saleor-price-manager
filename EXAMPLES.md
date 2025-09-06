@@ -2,17 +2,30 @@
 
 ## 🚀 Getting Started
 
-### Start the Application
+### Start the Full Application
 ```bash
 # 1. Deploy and setup
 ./DEPLOY
 
-# 2. Start the server
+# 2. Start both backend + frontend
 ./BANG
 
-# 3. Verify it's running
+# 3. Open in browser
+open http://localhost:3000  # 🌐 Frontend UI
+open http://localhost:8000/docs  # 📊 API Documentation
+
+# 4. Verify backend is running
 curl http://localhost:8000/health
 # {"status":"ok"}
+```
+
+### Alternative: Start Components Separately
+```bash
+# Terminal 1: Backend only
+./BANG_BACKEND_ONLY
+
+# Terminal 2: Frontend only 
+./START_FRONTEND
 ```
 
 ---
@@ -202,25 +215,35 @@ curl -X POST http://localhost:8000/webhooks/channel-created \
 
 ---
 
-## 📊 Interactive Documentation
+## 📊 Interactive Documentation & UI
 
-### Open Swagger UI
+### 🌐 Frontend Interface
 ```bash
-# In your browser, visit:
-open http://localhost:8000/docs
+# Visual channel management interface:
+open http://localhost:3000
 ```
 
-**Features:**
+**Frontend Features:**
+- ✅ **Visual Channel Management** - See all channels at a glance
+- ✅ **Interactive Markup Editor** - Update markups with instant feedback
+- ✅ **Price Calculator** - Test calculations in real-time
+- ✅ **Demo Data** - 3 sample channels ready to use
+- ✅ **API Integration** - Direct connection to FastAPI backend
+
+### 📊 API Documentation
+```bash
+# Swagger UI - Interactive API testing:
+open http://localhost:8000/docs
+
+# ReDoc - Beautiful API documentation:
+open http://localhost:8000/redoc
+```
+
+**API Features:**
 - ✅ Try all endpoints interactively
 - ✅ See request/response examples
 - ✅ Test with different parameters
 - ✅ Download OpenAPI specification
-
-### Open ReDoc
-```bash
-# Alternative documentation format:
-open http://localhost:8000/redoc
-```
 
 ---
 

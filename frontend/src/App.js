@@ -1,15 +1,25 @@
-import React from 'react';
-import { ApolloProvider } from '@apollo/client';
-import { createApolloClient } from '@saleor/app-sdk/apollo';
-import { AppBridgeProvider } from '@saleor/app-sdk/app-bridge';
-import PriceManager from './pages/PriceManager';
+import React, { useState, useEffect } from 'react';
+import PriceManager from './components/PriceManager';
 
 const App = () => {
-  const client = createApolloClient({
-    apiUrl: process.env.REACT_APP_API_URL,
-  });
+  return (
+    <div className="container">
+      <div className="header">
+        <h1>🚀 Saleor Price Manager</h1>
+        <span className="demo-badge">DEMO MODE</span>
+        <p>FastAPI microservice for dynamic multi-channel pricing</p>
+      </div>
+      
+      <div className="api-info">
+        <h3>📡 API Information</h3>
+        <p><strong>Backend:</strong> http://localhost:8000</p>
+        <p><strong>Swagger UI:</strong> <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer">http://localhost:8000/docs</a></p>
+        <p><strong>Health Check:</strong> <a href="http://localhost:8000/health" target="_blank" rel="noopener noreferrer">http://localhost:8000/health</a></p>
+      </div>
 
-  return '<AppBridgeProvider><ApolloProvider client={client}><PriceManager /></ApolloProvider></AppBridgeProvider>';
+      <PriceManager />
+    </div>
+  );
 };
 
 export default App;

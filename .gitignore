@@ -18,3 +18,10 @@ rust_modules/*/Cargo.lock
 *.dylib
 *.dll
 
+
+# Frontend dependencies
+frontend/node_modules/
+frontend/build/
+frontend/.env.local
+frontend/.env.production.local
+

@@ -39,8 +39,9 @@ REDIS_URL=redis://localhost:6379/0
 ./BANG
 ```
 
-**🎉 Your API is ready!** Available at:
-- **📊 Swagger UI**: http://localhost:8000/docs
+**🎉 Your application is ready!** Available at:
+- **🌐 Frontend UI**: http://localhost:3000
+- **📊 Swagger API**: http://localhost:8000/docs
 - **📖 ReDoc**: http://localhost:8000/redoc  
 - **💚 Health Check**: http://localhost:8000/health
 
@@ -70,14 +71,15 @@ graph TB
 **No Saleor token?** The application works perfectly in demo mode!
 
 ```bash
-./BANG  # Starts with demo data automatically
+./BANG  # Starts both backend + frontend
 ```
 
 **Demo Features:**
-- ✅ 3 sample channels (Default, Moscow Store, SPb Store)
-- ✅ Working price calculations with markups  
-- ✅ Full API functionality
-- ✅ Interactive Swagger UI
+- ✅ **React Frontend** - Visual channel management interface
+- ✅ **3 Sample Channels** - Default, Moscow Store, SPb Store
+- ✅ **Interactive Price Calculator** - Test markups in real-time
+- ✅ **Full API Documentation** - Swagger UI + ReDoc
+- ✅ **Working Price Calculations** - Powered by Rust module
 
 **Example API Call:**
 ```bash
@@ -122,6 +124,13 @@ curl -X POST http://localhost:8000/api/prices/calculate \
 
 ## 🔧 Development Workflow
 
+### Full Stack Development
+```bash
+./BANG                # Start both backend + frontend
+./BANG_BACKEND_ONLY   # Start only FastAPI backend
+./START_FRONTEND      # Start only React frontend
+```
+
 ### Building Rust Module
 ```bash
 ./BUILD  # Rebuild only the Rust price calculator
@@ -130,6 +139,16 @@ curl -X POST http://localhost:8000/api/prices/calculate \
 ### Running Tests
 ```bash
 ./TEST   # Run application tests
+```
+
+### Environment Variables
+```bash
+# Backend only (no frontend)
+START_FRONTEND=false ./BANG
+
+# Custom ports
+echo "APPLICATION_PORT=8001" >> .env
+echo "PORT=3001" >> frontend/.env
 ```
 
 ### File Structure
