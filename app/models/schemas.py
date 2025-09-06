@@ -22,7 +22,7 @@ class ChannelMarkup(BaseModel):
         return Decimal(round(v, 2))
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "channel_id": "Q2hhbm5lbDox",
                 "markup_percent": 15.5
@@ -41,7 +41,7 @@ class ChannelWithMarkup(BaseModel):
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id": "Q2hhbm5lbDox",
                 "name": "Moscow Store",
@@ -72,7 +72,7 @@ class PriceCalculationRequest(BaseModel):
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "product_id": "UHJvZHVjdDox",
                 "channel_id": "Q2hhbm5lbDox",
@@ -90,7 +90,7 @@ class PriceCalculationResponse(BaseModel):
     currency: str = Field(default="USD", description="Currency code")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "product_id": "UHJvZHVjdDox",
                 "channel_id": "Q2hhbm5lbDox",
@@ -124,7 +124,7 @@ class SaleorWebhookPayload(BaseModel):
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "event_type": "PRODUCT_UPDATED",
                 "product_id": "UHJvZHVjdDox",

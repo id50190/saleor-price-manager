@@ -1,41 +1,47 @@
 # Saleor Price Manager - Quick Start Guide
 
-🚀 **Быстрый запуск проекта в 2 шага:**
+🚀 **Get your Saleor Price Manager running in 2 steps:**
 
-## 📦 Шаг 1: Развертывание (DEPLOY)
+## 📦 Step 1: Deploy (Setup Environment)
 
 ```bash
 ./DEPLOY
 ```
 
-Эта команда выполнит:
-- ✅ Создание Python виртуального окружения
-- ✅ Установку всех зависимостей из requirements.txt
-- ✅ Сборку Rust модуля для высокопроизводительных вычислений
-- ✅ Настройку конфигурации (.env файл)
-- ✅ Проверку доступности Redis
-- ✅ Установку frontend зависимостей
+This command will:
+- ✅ Create Python virtual environment
+- ✅ Install all dependencies from requirements.txt
+- ✅ Build Rust module for high-performance calculations
+- ✅ Setup configuration (.env file)
+- ✅ Check Redis availability
+- ✅ Install frontend dependencies
 
-## 🔥 Шаг 2: Запуск (BANG)
+## 🔥 Step 2: Start Application (BANG)
 
 ```bash
 ./BANG
 ```
 
-Эта команда:
-- ✅ Загружает переменные окружения из .env
-- ✅ Активирует Python виртуальное окружение
-- ✅ Проверяет все зависимости
-- ✅ Запускает FastAPI сервер с автоперезагрузкой
+This command:
+- ✅ Loads environment variables from .env
+- ✅ Activates Python virtual environment
+- ✅ Checks all dependencies
+- ✅ Starts FastAPI server with auto-reload
 
 ---
 
-## 📋 Что получится после запуска:
+## 🎉 Your API is Ready!
 
 - **🌐 API Server**: http://localhost:8000
 - **📚 Swagger UI**: http://localhost:8000/docs
 - **📖 ReDoc**: http://localhost:8000/redoc
 - **💚 Health Check**: http://localhost:8000/health
+
+### ✨ Demo Mode Available
+**No Saleor token required!** The application includes demo data:
+- 3 sample channels (Default, Moscow Store, SPb Store)
+- Working price calculations with markups
+- Full API functionality for testing
 
 ---
 

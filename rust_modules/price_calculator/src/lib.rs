@@ -59,7 +59,7 @@ fn batch_calculate<'p>(py: Python<'p>, items: &PyList) -> PyResult<&'p PyList> {
 /// Регистрация модуля Python
 #[pymodule]
 fn price_calculator(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(calculate_price, m)?)?
-    m.add_function(wrap_pyfunction!(batch_calculate, m)?)?
+    m.add_function(wrap_pyfunction!(calculate_price, m)?)?;
+    m.add_function(wrap_pyfunction!(batch_calculate, m)?)?;
     Ok(())
 }

@@ -29,7 +29,7 @@ router = APIRouter()
         500: {"description": "Internal server error"}
     }
 )
-async def list_channels(token: str = Depends(verify_token)):
+async def list_channels():  # Временно убрали аутентификацию для demo
     """Get list of all channels with markup information"""
     from app.saleor.api import list_channels
     
@@ -67,7 +67,7 @@ async def list_channels(token: str = Depends(verify_token)):
         422: {"description": "Request validation failed"}
     }
 )
-async def set_markup(markup: ChannelMarkup, token: str = Depends(verify_token)):
+async def set_markup(markup: ChannelMarkup):  # Временно убрали аутентификацию для demo
     """Set markup percentage for a channel"""
     success = await markup_service.set_channel_markup(
         markup.channel_id, markup.markup_percent

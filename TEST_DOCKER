@@ -1,0 +1,66 @@
+#!/usr/bin/bash
+
+echo "$0: Running Docker-based tests at $(date)"
+
+set -eu
+cd "$(dirname "$0")"
+
+TEST_TYPE=${1:-all}
+
+case $TEST_TYPE in
+  "api")
+    echo "🧪 Running API tests in Docker..."
+    docker-compose -f docker-compose.test.yml up --build redis-test api-test
+    docker-compose -f docker-compose.test.yml run --rm test-runner pytest tests/api/ --verbose
+    ;;
+  "frontend")
+    echo "🌐 Running frontend E2E tests in Docker..."
+    docker-compose -f docker-compose.test.yml --profile e2e up --build
+    ;;
+  "integration")
+    echo "🔄 Running integration tests in Docker..."
+    docker-compose -f docker-compose.test.yml up --build
+    docker-compose -f docker-compose.test.yml run --rm test-runner pytest tests/api/test_integration.py -m integration
+    ;;
+  "all")
+    echo "🚀 Running all tests in Docker..."
+    # Start services
+    docker-compose -f docker-compose.test.yml up -d --build redis-test api-test frontend-test
+    
+    # Wait for services to be healthy
+    echo "⏳ Waiting for services to be ready..."
+    sleep 10
+    
+    # Run API tests
+    echo "🧪 Running API tests..."
+    docker-compose -f docker-compose.test.yml run --rm test-runner pytest tests/api/ --verbose --cov=app
+    API_EXIT_CODE=$?
+    
+    # Run E2E tests
+    echo "🌐 Running E2E tests..."
+    docker-compose -f docker-compose.test.yml --profile e2e run --rm playwright-runner
+    E2E_EXIT_CODE=$?
+    
+    # Cleanup
+    docker-compose -f docker-compose.test.yml down
+    
+    # Check results
+    if [[ $API_EXIT_CODE -ne 0 || $E2E_EXIT_CODE -ne 0 ]]; then
+      echo "❌ Some tests failed!"
+      exit 1
+    fi
+    
+    echo "✅ All Docker tests passed!"
+    ;;
+  *)
+    echo "Usage: $0 [api|frontend|integration|all]"
+    echo "  api         - Run API tests with pytest"
+    echo "  frontend    - Run frontend E2E tests with Playwright"
+    echo "  integration - Run integration tests"
+    echo "  all         - Run all tests (default)"
+    exit 1
+    ;;
+esac
+
+echo "🎉 Docker tests completed successfully!"
+exit 0

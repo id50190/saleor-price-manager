@@ -7,9 +7,13 @@ from app.services.markup_service import markup_service
 try:
     import price_calculator
 except ImportError:
-    # Fallback to pure Python implementation if Rust module is not available
-    price_calculator = None
-    print("Warning: Rust price_calculator module not available, using Python fallback")
+    try:
+        # Try importing from rust_modules directory
+        from rust_modules import price_calculator  
+    except ImportError:
+        # Fallback to pure Python implementation if Rust module is not available
+        price_calculator = None
+        print("Warning: Rust price_calculator module not available, using Python fallback")
 
 def _python_calculate_price(base_price: str, markup_percent: str) -> str:
     """
