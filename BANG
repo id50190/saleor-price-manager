@@ -161,9 +161,9 @@ if [[ "$START_FRONTEND" == "true" ]]; then
   # Start frontend in background
   cd frontend
   if command -v pnpm &> /dev/null; then
-    pnpm start &
+    pnpm dev -- --port 3000 --host 0.0.0.0 &
   else
-    npm start &
+    npm run dev -- --port 3000 --host 0.0.0.0 &
   fi
   FRONTEND_PID=$!
   cd ..

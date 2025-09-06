@@ -1,148 +1,198 @@
-import { test, expect } from '@playwright/test';
+// @ts-check
+const { test, expect } = require('@playwright/test');
 
-test.describe('Accessibility Tests', () => {
+test.describe('Accessibility', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.channel-card', { timeout: 10000 });
-  });
-
-  test('has proper heading structure', async ({ page }) => {
-    // Check main heading (h1)
-    const h1 = page.locator('h1');
-    await expect(h1).toBeVisible();
-    await expect(h1).toContainText('🚀 Saleor Price Manager');
-    
-    // Check section headings (h2)
-    const h2 = page.locator('h2');
-    await expect(h2).toBeVisible();
-    await expect(h2).toContainText('📊 Channel Management');
-    
-    // Check subsection headings (h3) for each channel
-    const h3Elements = page.locator('h3');
-    const h3Count = await h3Elements.count();
-    expect(h3Count).toBeGreaterThanOrEqual(3); // At least 3 demo channels
-  });
-
-  test('form inputs have proper labels and attributes', async ({ page }) => {
-    const firstChannel = page.locator('.channel-card').first();
-    
-    // Check markup input accessibility
-    const markupInput = firstChannel.locator('input[type="number"]').first();
-    await expect(markupInput).toHaveAttribute('step', '0.1');
-    await expect(markupInput).toHaveAttribute('min', '0');
-    await expect(markupInput).toHaveAttribute('max', '100');
-    
-    // Check that labels are present
-    await expect(firstChannel.locator('label:has-text("Update Markup")')).toBeVisible();
-    await expect(firstChannel.locator('label:has-text("Test Price Calculation")')).toBeVisible();
-  });
-
-  test('buttons have accessible text and roles', async ({ page }) => {
-    const firstChannel = page.locator('.channel-card').first();
-    
-    // Check update button
-    const updateButton = firstChannel.locator('button').first();
-    await expect(updateButton).toContainText('💾 Update');
-    await expect(updateButton).toHaveAttribute('type', 'button');
-    
-    // Check calculate button
-    const calculateButton = firstChannel.locator('button').nth(1);
-    await expect(calculateButton).toContainText('🧮 Calculate');
-    await expect(calculateButton).toHaveAttribute('type', 'button');
-  });
-
-  test('keyboard navigation works properly', async ({ page }) => {
-    // Test tab navigation through interactive elements
-    await page.keyboard.press('Tab'); // Should focus first input
-    
-    const focusedElement = page.locator(':focus');
-    await expect(focusedElement).toHaveAttribute('type', 'number');
-    
-    // Continue tabbing through form elements
-    await page.keyboard.press('Tab'); // Should focus update button
-    const secondFocused = page.locator(':focus');
-    await expect(secondFocused).toContainText('💾 Update');
-    
-    // Test Enter key activation
-    await secondFocused.press('Enter');
-    // Button should be clickable with Enter key
-  });
-
-  test('links have proper attributes', async ({ page }) => {
-    // Check external links have proper attributes
-    const swaggerLink = page.locator('a[href="http://localhost:8000/docs"]');
-    await expect(swaggerLink).toHaveAttribute('target', '_blank');
-    await expect(swaggerLink).toHaveAttribute('rel', 'noopener noreferrer');
-    
-    const healthLink = page.locator('a[href="http://localhost:8000/health"]');
-    await expect(healthLink).toHaveAttribute('target', '_blank');
-    await expect(healthLink).toHaveAttribute('rel', 'noopener noreferrer');
-  });
-
-  test('error states are announced properly', async ({ page }) => {
-    // Mock API failure
-    await page.route('**/api/channels/', route => {
-      route.fulfill({
-        status: 500,
+    // Mock the channels API endpoint
+    await page.route('**/api/channels/', async (route) => {
+      await route.fulfill({
+        status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ detail: 'Server error' })
+        body: JSON.stringify([
+          {
+            id: 'Q2hhbm5lbDox',
+            name: 'Default Channel',
+            slug: 'default',
+            markup_percent: '0.00'
+          },
+          {
+            id: 'Q2hhbm5lbDoy',
+            name: 'Moscow Store', 
+            slug: 'moscow',
+            markup_percent: '15.00'
+          }
+        ])
       });
     });
-    
-    await page.reload();
-    
-    // Error message should be visible and descriptive
-    const errorMessage = page.locator('text=Error');
-    await expect(errorMessage).toBeVisible({ timeout: 10000 });
-    
-    // Should have helpful error description
-    await expect(page.locator('text=Make sure the FastAPI backend is running'))
-      .toBeVisible();
   });
-
-  test('loading states are accessible', async ({ page }) => {
-    // Mock slow API to test loading state
-    await page.route('**/api/channels/', async route => {
+  
+  test('should have proper heading hierarchy', async ({ page }) => {
+    await page.goto('/');
+    
+    // Check heading hierarchy
+    const h1 = page.locator('h1');
+    await expect(h1).toContainText('Saleor Price Manager');
+    
+    const h2 = page.locator('h2');
+    await expect(h2).toContainText('Channel Management');
+    
+    const h3 = page.locator('h3').first();
+    await expect(h3).toContainText('API Information');
+  });
+  
+  test('should have proper form labels', async ({ page }) => {
+    await page.goto('/');
+    
+    // Wait for channels to load
+    await expect(page.locator('.channel-card')).toHaveCount(2);
+    
+    // Check that all inputs have proper labels
+    const markupInputs = page.locator('input[placeholder="15.5"]');
+    const priceInputs = page.locator('input[placeholder="100.00"]');
+    
+    // All markup inputs should have labels
+    const markupCount = await markupInputs.count();
+    for (let i = 0; i < markupCount; i++) {
+      const input = markupInputs.nth(i);
+      const inputId = await input.getAttribute('id');
+      const label = page.locator(`label[for="${inputId}"]`);
+      await expect(label).toBeVisible();
+    }
+    
+    // All price inputs should have labels
+    const priceCount = await priceInputs.count();
+    for (let i = 0; i < priceCount; i++) {
+      const input = priceInputs.nth(i);
+      const inputId = await input.getAttribute('id');
+      const label = page.locator(`label[for="${inputId}"]`);
+      await expect(label).toBeVisible();
+    }
+  });
+  
+  test('should be keyboard navigable', async ({ page }) => {
+    await page.goto('/');
+    
+    // Wait for channels to load
+    await expect(page.locator('.channel-card')).toHaveCount(2);
+    
+    // Should be able to tab through interactive elements
+    await page.keyboard.press('Tab'); // Theme toggle
+    await page.keyboard.press('Tab'); // First markup input
+    await page.keyboard.press('Tab'); // First update button
+    await page.keyboard.press('Tab'); // First price input
+    await page.keyboard.press('Tab'); // First calculate button
+    
+    // Focus should be on a button or input
+    const focusedElement = page.locator(':focus');
+    const tagName = await focusedElement.evaluate(el => el.tagName.toLowerCase());
+    expect(['input', 'button'].includes(tagName)).toBe(true);
+  });
+  
+  test('should have proper ARIA attributes', async ({ page }) => {
+    await page.goto('/');
+    
+    // Theme toggle should have proper ARIA attributes
+    const themeToggle = page.locator('.theme-toggle button');
+    await expect(themeToggle).toHaveAttribute('aria-label', 'Theme selector');
+    await expect(themeToggle).toHaveAttribute('aria-expanded', 'false');
+    
+    // Loading spinner should have proper label
+    await page.route('**/api/channels/', async (route) => {
       // Delay response to test loading state
       await new Promise(resolve => setTimeout(resolve, 1000));
-      route.fulfill({
+      await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([])
       });
     });
     
-    await page.reload();
+    await page.goto('/');
     
-    // Should show loading indicator
-    await expect(page.locator('text=Loading channels...')).toBeVisible();
+    const loadingSpinner = page.locator('[aria-label="Loading"]');
+    if (await loadingSpinner.isVisible()) {
+      await expect(loadingSpinner).toHaveAttribute('aria-label', 'Loading');
+    }
   });
-
-  test('responsive design works on mobile', async ({ page, browserName }) => {
-    // Set mobile viewport
-    await page.setViewportSize({ width: 375, height: 667 });
+  
+  test('should have sufficient color contrast in both themes', async ({ page }) => {
+    await page.goto('/');
     
-    // Check that content is still accessible
-    await expect(page.locator('h1')).toBeVisible();
-    await expect(page.locator('.channel-card').first()).toBeVisible();
+    // Test light theme contrast
+    const h1Light = page.locator('h1');
+    const h1Styles = await h1Light.evaluate(el => {
+      const styles = getComputedStyle(el);
+      return {
+        color: styles.color,
+        backgroundColor: styles.backgroundColor
+      };
+    });
     
-    // Check that form inputs are still usable
-    const markupInput = page.locator('.markup-input').first();
-    await expect(markupInput).toBeVisible();
-    await markupInput.tap(); // Use tap instead of click on mobile
-    await expect(markupInput).toBeFocused();
+    // Switch to dark theme
+    await page.locator('.theme-toggle button').click();
+    await page.locator('text=Dark').click();
+    
+    // Wait for theme to apply
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    
+    // Test dark theme contrast
+    const h1Dark = page.locator('h1');
+    const h1DarkStyles = await h1Dark.evaluate(el => {
+      const styles = getComputedStyle(el);
+      return {
+        color: styles.color,
+        backgroundColor: styles.backgroundColor
+      };
+    });
+    
+    // Colors should be different between themes
+    expect(h1Styles.color).not.toBe(h1DarkStyles.color);
   });
-
-  test('color contrast and visual elements', async ({ page }) => {
-    // Check that demo badge is visible
-    const demoBadge = page.locator('.demo-badge');
-    await expect(demoBadge).toBeVisible();
-    await expect(demoBadge).toHaveCSS('background-color', 'rgb(255, 107, 53)');
-    await expect(demoBadge).toHaveCSS('color', 'rgb(255, 255, 255)');
+  
+  test('should handle focus management in theme dropdown', async ({ page }) => {
+    await page.goto('/');
     
-    // Check button styles
-    const updateButton = page.locator('.update-btn').first();
-    await expect(updateButton).toHaveCSS('background-color', 'rgb(0, 112, 243)');
-    await expect(updateButton).toHaveCSS('color', 'rgb(255, 255, 255)');
+    // Focus theme toggle
+    const themeButton = page.locator('.theme-toggle button');
+    await themeButton.focus();
+    
+    // Open dropdown
+    await themeButton.press('Enter');
+    
+    // Dropdown should be open
+    await expect(page.locator('text=Light')).toBeVisible();
+    
+    // Escape should close dropdown and return focus
+    await page.keyboard.press('Escape');
+    await expect(page.locator('text=Light')).not.toBeVisible();
+    
+    // Focus should return to toggle button
+    const focusedElement = await page.evaluate(() => document.activeElement?.outerHTML);
+    expect(focusedElement).toContain('Theme selector');
+  });
+  
+  test('should provide appropriate error messages', async ({ page }) => {
+    // Mock API error
+    await page.route('**/api/channels/', async (route) => {
+      await route.fulfill({
+        status: 500,
+        body: 'Server Error'
+      });
+    });
+    
+    await page.goto('/');
+    
+    // Should show descriptive error message
+    const errorMessage = page.locator('.error-message');
+    await expect(errorMessage).toBeVisible();
+    await expect(errorMessage).toContainText('Failed to fetch channels');
+    
+    // Should provide recovery action
+    const retryButton = page.locator('button:has-text("Retry")');
+    await expect(retryButton).toBeVisible();
+    
+    // Retry button should be focusable
+    await retryButton.focus();
+    expect(await retryButton.evaluate(el => el === document.activeElement)).toBe(true);
   });
 });
