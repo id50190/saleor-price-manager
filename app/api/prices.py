@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from app.models.schemas import PriceCalculationRequest, PriceCalculationResponse
 from app.services.price_calculator import calculate_price_with_markup, batch_calculate_prices
+from app.services.discount_service import discount_service
+from app.saleor.api import get_product, get_channel_by_subdomain
 from app.services.markup_service import markup_service
 from app.core.security import verify_token
 
@@ -195,4 +197,104 @@ async def calculate_price_by_subdomain(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail=f"Price calculation failed: {str(e)}"
+        )
+
+@router.post(
+    "/calculate-with-discounts", 
+    response_model=PriceCalculationResponse,
+    summary="Calculate Product Price with Discounts",
+    description="""Calculate the final price for a product including active discounts.
+    
+    This endpoint calculates price with both channel markup and active product discounts.
+    It shows detailed information about which discount was applied (if any).
+    
+    **Formula:** 
+    1. Apply channel markup: `marked_price = base_price * (1 + markup_percent / 100)`
+    2. Apply discount: `final_price = marked_price * (1 + discount_percent / 100)`
+    3. Apply cap if specified in discount
+    
+    **Parameters:**
+    - product_id: Base64 encoded Saleor product ID
+    - channel_id: Base64 encoded Saleor channel ID (optional if subdomain provided)
+    - base_price: Original price before markup and discounts
+    - subdomain: Alternative way to specify channel via subdomain (optional)
+    
+    **Returns:**
+    - Detailed price calculation including discount information
+    """,
+    responses={
+        200: {"description": "Price calculated successfully with discount info"},
+        400: {"description": "Calculation error"},
+        404: {"description": "Product or channel not found"},
+        422: {"description": "Request validation failed"}
+    }
+)
+async def calculate_price_with_discounts(
+    request: PriceCalculationRequest, 
+    subdomain: str = None
+):
+    """Calculate product price with detailed discount information"""
+    try:
+        channel_id = request.channel_id
+        
+        # Если указан subdomain, ищем канал по нему
+        if subdomain:
+            channel = await get_channel_by_subdomain(subdomain)
+            if not channel:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"No channel found for subdomain: {subdomain}"
+                )
+            channel_id = channel["id"]
+        
+        # Получаем продукт и его скидки
+        product = await get_product(request.product_id)
+        if not product:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Product not found: {request.product_id}"
+            )
+        
+        # Парсим скидки
+        discounts_json = next(
+            (meta["value"] for meta in product.get("metadata", []) if meta["key"] == "discounts"),
+            ""
+        )
+        discounts = discount_service.parse_discounts(discounts_json)
+        active_discount = discount_service.get_active_discount(discounts)
+        
+        # Рассчитываем цену (это уже включает скидку)
+        final_price = await calculate_price_with_markup(
+            request.product_id,
+            channel_id,
+            request.base_price
+        )
+        
+        markup_percent = await markup_service.get_channel_markup(channel_id)
+        
+        # Формируем ответ
+        response_data = {
+            "product_id": request.product_id,
+            "channel_id": channel_id,
+            "base_price": str(request.base_price),
+            "markup_percent": str(markup_percent),
+            "final_price": str(final_price),
+            "currency": "USD",
+            "discount_applied": active_discount is not None,
+        }
+        
+        if active_discount:
+            response_data.update({
+                "discount_percent": str(active_discount.get("percent", 0)),
+                "active_discount": active_discount
+            })
+        
+        return PriceCalculationResponse(**response_data)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=f"Price calculation with discounts failed: {str(e)}"
         )

@@ -21,6 +21,9 @@ export function getSubdomainFromUrl(): string | null {
   return null;
 }
 
+import { goto } from '$app/navigation';
+import { page } from '$app/stores';
+
 export function setSubdomainParam(subdomain: string): void {
   if (typeof window === 'undefined') return;
   
@@ -31,9 +34,8 @@ export function setSubdomainParam(subdomain: string): void {
     url.searchParams.delete('subdomain');
   }
   
-  // Use replaceState to update URL without navigation
-  // Note: SvelteKit warns about this, but for URL parameters without routing it's acceptable
-  window.history.replaceState({}, '', url.toString());
+  // Use SvelteKit navigation instead of direct history API
+  goto(url.pathname + url.search, { replaceState: true, noScroll: true });
 }
 
 export function getAvailableSubdomains(): string[] {
