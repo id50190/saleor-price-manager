@@ -2,7 +2,6 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::*;
-use serde::{Deserialize, Serialize};
 
 /// Рассчитывает цену с учетом наценки
 #[pyfunction]
@@ -28,9 +27,19 @@ fn batch_calculate<'p>(py: Python<'p>, items: &PyList) -> PyResult<&'p PyList> {
     for item_obj in items.iter() {
         let item = item_obj.downcast::<PyDict>()?;
         
-        let product_id = item.get_item("product_id")?.extract::<String>()?;
-        let base_price = item.get_item("base_price")?.extract::<String>()?;
-        let markup_percent = item.get_item("markup_percent")?.extract::<String>()?;
+        // Извлекаем значения и преобразуем их в String
+        let product_id = item
+            .get_item("product_id")?
+            .expect("Missing product_id")
+            .extract::<String>()?;
+        let base_price = item
+            .get_item("base_price")?
+            .expect("Missing base_price")
+            .extract::<String>()?;
+        let markup_percent = item
+            .get_item("markup_percent")?
+            .expect("Missing markup_percent")
+            .extract::<String>()?;
         
         // Расчет цены
         let final_price = calculate_price(base_price, markup_percent)?;
@@ -50,7 +59,7 @@ fn batch_calculate<'p>(py: Python<'p>, items: &PyList) -> PyResult<&'p PyList> {
 /// Регистрация модуля Python
 #[pymodule]
 fn price_calculator(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(calculate_price, m)?)?;
-    m.add_function(wrap_pyfunction!(batch_calculate, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_price, m)?)?
+    m.add_function(wrap_pyfunction!(batch_calculate, m)?)?
     Ok(())
 }

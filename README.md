@@ -1,3 +1,38 @@
+# Saleor Price Manager
+
+🚀 **FastAPI microservice for dynamic multi-channel pricing in Saleor eCommerce with high-performance Rust calculations**
+
+## ⚡ Quick Start
+
+```bash
+# 1. Deploy (setup environment, build dependencies)
+./DEPLOY
+
+# 2. Configure your Saleor API credentials in .env file
+vim .env
+
+# 3. Start the application
+./BANG
+```
+
+**That's it!** 🎉 Your API will be available at:
+- **Swagger UI**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+
+> 📚 For detailed instructions see [QUICKSTART.md](QUICKSTART.md)
+
+---
+
+## 🏇 Architecture
+
+- **🔥 FastAPI** - Modern async API framework with automatic documentation
+- **🦀 Rust Module** - High-performance price calculations via PyO3
+- **📋 Redis** - Fast caching for markup data
+- **🌐 Saleor Integration** - GraphQL API client with webhook support
+- **⚙️ React Frontend** - Management interface for Saleor Dashboard
+
+---
+
 # Настройка поддоменов через админку Saleor
 
 Частично функциональность для поддоменов можно настроить через стандартную админку Saleor Dashboard, но для полноценного решения потребуются дополнительные разработки.
