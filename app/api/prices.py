@@ -33,7 +33,7 @@ router = APIRouter()
         422: {"description": "Request validation failed"}
     }
 )
-async def calculate_price(request: PriceCalculationRequest, token: str = Depends(verify_token)):
+async def calculate_price(request: PriceCalculationRequest):  # Временно убрали аутентификацию для demo
     """Calculate product price with channel markup"""
     try:
         markup_percent = await markup_service.get_channel_markup(request.channel_id)
@@ -83,7 +83,7 @@ async def calculate_price(request: PriceCalculationRequest, token: str = Depends
         422: {"description": "Request validation failed"}
     }
 )
-async def batch_calculate(items: List[PriceCalculationRequest], token: str = Depends(verify_token)):
+async def batch_calculate(items: List[PriceCalculationRequest]):  # Временно убрали аутентификацию для demo
     """Batch calculate prices for multiple products"""
     try:
         results = []
