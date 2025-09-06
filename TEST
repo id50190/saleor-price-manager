@@ -96,9 +96,18 @@ if [[ "$TEST_TYPE" == "api" || "$TEST_TYPE" == "all" ]]; then
   # Activate virtual environment
   source env/bin/activate
   
-  # Install test dependencies
+  # Install test dependencies (without Rust module)
   echo 'Installing test dependencies...'
-  pip install -r requirements-dev.txt
+  if [[ -f requirements-test.txt ]]; then
+    pip install -r requirements-test.txt
+    echo 'Note: Using test-only requirements (Rust module mocked)'
+  else
+    pip install -r requirements-dev.txt
+    echo 'Note: API tests run with mocked Rust module - no Rust build required'
+  fi
+  
+  # Set PYTHONPATH to include current directory
+  export PYTHONPATH="${PWD}:${PYTHONPATH:-}"
   
   # Run API tests
   echo 'Running pytest with coverage...'
