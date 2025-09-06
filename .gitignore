@@ -10,3 +10,11 @@ venv/
 requirements-test.txt
 __pycache__/
 *.pyc
+
+# Rust build artifacts
+rust_modules/*/target/
+rust_modules/*/Cargo.lock
+*.so
+*.dylib
+*.dll
+
