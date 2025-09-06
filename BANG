@@ -190,8 +190,14 @@ fi
 # Start the backend application
 echo "Starting backend API server..."
 if [[ "${RELOAD:-true}" == "true" ]]; then
-  # Development mode with auto-reload
-  uvicorn main:app --reload --host "${APPLICATION_HOST}" --port "${APPLICATION_PORT}"
+  # Development mode with auto-reload (exclude frontend to prevent file watch limits)
+  uvicorn main:app --reload --host "${APPLICATION_HOST}" --port "${APPLICATION_PORT}" \
+    --reload-exclude "frontend/*" \
+    --reload-exclude "frontend-react-backup/*" \
+    --reload-exclude "**/node_modules/*" \
+    --reload-exclude "**/.svelte-kit/*" \
+    --reload-exclude "**/__pycache__/*" \
+    --reload-exclude "**/.*"
 else
   # Production mode
   uvicorn main:app --host "${APPLICATION_HOST}" --port "${APPLICATION_PORT}" --workers 4

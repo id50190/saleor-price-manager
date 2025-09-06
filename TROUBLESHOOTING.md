@@ -2,7 +2,15 @@
 
 ## File Watch Limit Issues
 
-If you see `OS file watch limit reached` errors, increase the system limits:
+**Why this happens after SvelteKit 5 migration:**
+- SvelteKit 5 has more dependencies (larger node_modules)
+- uvicorn --reload tries to watch ALL files including frontend/node_modules
+- System reaches inotify limit (typically ~8192 files)
+- Backend crashes with "OS file watch limit reached"
+
+**Fixed in scripts:** BANG and BANG_BACKEND_ONLY now exclude frontend from watching.
+
+**Manual fix if needed:** If you still see `OS file watch limit reached` errors, increase the system limits:
 
 ### Linux (Ubuntu/Debian)
 
