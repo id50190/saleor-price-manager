@@ -1,0 +1,7 @@
+.env
+
++/
+env/
+.DS_Store
+desktop.ini
+__pycache__/*

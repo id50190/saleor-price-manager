@@ -1,0 +1,85 @@
+#!/usr/bin/bash
+
+echo "$0: Script started at $(date)"
+
+# ==============================================================================
+# 🔥 I N I T I A L I Z E
+# ==============================================================================
+
+./init.bash || exit 1
+
+# ==============================================================================
+# ⚙️ S E T T I N G S
+# ==============================================================================
+
+set -eu || set -o errexit && set -o nounset; set -o pipefail; set +o history # Use `set -o` to list all shell settings # https://www.gnu.org/software/bash/manual/html_node/
+
+cd "$(dirname "$0")" && SCRIPT_DIR="$(pwd)"
+DIVIDER="$(printf '=%.0s' {1..80})" && div() {
+  if [[ ! -z "$1" ]]; then echo "$(printf "$1"'%.0s' {1..80})"
+  else echo "$DIVIDER"; fi
+}
+VERBOSE=true
+UNATTENDED=false
+error_code=1 # Praesumptio
+ending=Done.
+
+abort() {
+  ending=$1
+  exit ${2:-1} # Default error code is 1 (common)
+}
+
+cadence() { # Callback
+  set +eu || set +o errexit && set +o nounset; set +o pipefail; set -o history # Use `set -o` to list all shell settings
+  [[ $error_code -ne 0 && "$ending" == Done. ]] && ending='An error occurred during execution!'
+  [[ -v ending && ! -z "$ending" ]] && echo "$0: $ending"
+}; trap cadence EXIT # Set the signal handler EXIT (to ensure a graceful cadence)
+
+# ==============================================================================
+# 🧬 P R E R E Q U I S I T E S
+# ==============================================================================
+
+[[ -v http_proxy ]] && unset http_proxy; [[ -v https_proxy ]] && unset https_proxy; [[ -v all_proxy ]] && unset all_proxy; [[ -v HTTP_PROXY ]] && unset HTTP_PROXY; [[ -v HTTPS_PROXY ]] && unset HTTPS_PROXY; [[ -v ALL_PROXY ]] && unset ALL_PROXY; [[ ! -v http_proxy && ! -v https_proxy && ! -v all_proxy && ! -v HTTP_PROXY && ! -v HTTPS_PROXY && ! -v ALL_PROXY ]] && echo 'Environment variables for proxying have been reset!'
+
+cd "$(dirname "$0")"
+
+# ==============================================================================
+# 🐬 P R E F E R E N C E S
+# ==============================================================================
+
+# if [[ ! -f ./.env ]]; then
+#   ending="Error: File \`.env\` doesn’t exists in \`$(pwd)\` directory." && exit 1
+# fi
+# 
+# source ./.env; if [[ $? -ne 0 ]]; then
+#   ending="Failed to setup environment." && exit 1
+# fi
+
+# ==============================================================================
+# 💥 B A N G
+# ==============================================================================
+
+if [[ ! -d ./env ]]; then # Check the existence of a virtual environment (Python)
+  abort "Error: Directory \`$(pwd)/env\` doesn’t exists."
+fi
+
+source env/bin/activate; if [[ $? -ne 0 ]]; then # Activate virtual environment (Python)
+  abort 'Failed to activate Python virtual environment.'
+fi
+
+uvicorn main:app --reload --host "${APPLICATION_HOST}" --port "${APPLICATION_PORT}"
+
+# ==============================================================================
+# 🚧 T E R M I N A T E
+# ==============================================================================
+
+deactivate
+exit $error_code # 🔳 Q.E.D.
+
+# ==============================================================================
+# 🧷 A L S O
+# ==============================================================================
+
+# - https://www.shellcheck.net/
+# - https://chmod-calculator.com/
+# - https://crontab.guru/
