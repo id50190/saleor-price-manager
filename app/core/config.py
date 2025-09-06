@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     # Additional settings that may be present in .env but not used by our app
     APPLICATION_HOST: str = "0.0.0.0"
     APPLICATION_PORT: int = 8000
+    APPLICATION_PORT_FRONTEND: int = 3000
     DEBUG: bool = True
     RELOAD: bool = True
 

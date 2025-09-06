@@ -161,11 +161,8 @@ if [[ "$START_FRONTEND" == "true" ]]; then
   # Sync backend host/port to frontend environment
   echo "Syncing API configuration to frontend..."
   API_HOST=${APPLICATION_HOST}
-  # Convert local addresses to localhost for frontend (browser compatibility)
-  # Both 0.0.0.0 and 127.0.0.1 should become localhost for browser access
-  if [[ "$API_HOST" == "0.0.0.0" ]] || [[ "$API_HOST" == "127.0.0.1" ]]; then
-    API_HOST="localhost"
-  fi
+  # Keep host as-is to match CORS configuration
+  # Host must match exactly what's configured in CORS_ORIGINS
   
   cat > frontend/.env << EOF
 # Auto-generated from backend configuration
