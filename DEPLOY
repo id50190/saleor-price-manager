@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-echo "$0: Script started at $(date)"
+echo "$0: Deployment started at $(date)"
 
 # ==============================================================================
 # 🔥 I N I T I A L I Z E
@@ -12,7 +12,7 @@ echo "$0: Script started at $(date)"
 # ⚙️ S E T T I N G S
 # ==============================================================================
 
-set -eu || set -o errexit && set -o nounset; set -o pipefail; set +o history # Use `set -o` to list all shell settings # https://www.gnu.org/software/bash/manual/html_node/
+set -eu || set -o errexit && set -o nounset; set -o pipefail; set +o history
 
 DIVIDER="$(printf '=%.0s' {1..80})" && div() { echo "$DIVIDER"; }
 VERBOSE=true
@@ -26,8 +26,8 @@ abort() {
 }
 
 cadence() { # Callback
-  set +eu || set +o errexit && set +o nounset; set +o pipefail; set -o history # Use `set -o` to list all shell settings
-  [[ $error_code -ne 0 && "$ending" == Done. ]] && ending='An error occurred during execution!'
+  set +eu || set +o errexit && set +o nounset; set +o pipefail; set -o history
+  [[ $error_code -ne 0 && "$ending" == Done. ]] && ending='An error occurred during deployment!'
   [[ -v ending && ! -z "$ending" ]] && echo "$0: $ending"
 }; trap cadence EXIT # Set the signal handler EXIT (to ensure a graceful cadence)
 
@@ -35,38 +35,199 @@ cadence() { # Callback
 # 🧬 P R E R E Q U I S I T E S
 # ==============================================================================
 
+# Clear proxy environment variables
 [[ -v http_proxy ]] && unset http_proxy; [[ -v https_proxy ]] && unset https_proxy; [[ -v all_proxy ]] && unset all_proxy; [[ -v HTTP_PROXY ]] && unset HTTP_PROXY; [[ -v HTTPS_PROXY ]] && unset HTTPS_PROXY; [[ -v ALL_PROXY ]] && unset ALL_PROXY; [[ ! -v http_proxy && ! -v https_proxy && ! -v all_proxy && ! -v HTTP_PROXY && ! -v HTTPS_PROXY && ! -v ALL_PROXY ]] && echo 'Environment variables for proxying have been reset!'
 
 cd "$(dirname "$0")"
 
 # ==============================================================================
-# 💥 B A N G
+# 🐳 E N V I R O N M E N T  S E T U P
 # ==============================================================================
 
-[[ -d ./env ]] && rm -rf ./env; python3 -m venv env # Creating virtual environment (Python)
+echo "Setting up environment variables..."
 
-if [[ ! -d ./env ]]; then # Check the existence of a virtual environment (Python)
-  abort "Error: Directory \`$(pwd)/env\` doesn’t exists."
+# Create .env file if it doesn't exist
+if [[ ! -f .env ]]; then
+  echo "Creating .env file with default values..."
+  cat << 'EOF' > .env
+# Saleor Price Manager Configuration
+APP_URL=http://localhost:8000
+APP_FRONTEND_URL=http://localhost:3000
+SALEOR_API_URL=https://your-instance.saleor.cloud/graphql/
+REDIS_URL=redis://localhost:6379/0
+CORS_ORIGINS=["http://localhost:3000", "https://your-instance.saleor.cloud"]
+SALEOR_APP_TOKEN=your_saleor_app_token_here
+
+# Application runtime settings
+APPLICATION_HOST=0.0.0.0
+APPLICATION_PORT=8000
+
+# Development settings
+DEBUG=true
+RELOAD=true
+EOF
+  echo "✅ Created .env file. Please edit it with your actual values before running BANG!"
+else
+  echo "✅ .env file already exists"
 fi
 
-source env/bin/activate; if [[ $? -ne 0 ]]; then # Activate virtual environment (Python)
+# ==============================================================================
+# 🐍 P Y T H O N  E N V I R O N M E N T
+# ==============================================================================
+
+echo "Setting up Python virtual environment..."
+div
+
+# Remove existing virtual environment
+[[ -d ./env ]] && rm -rf ./env
+
+# Create new virtual environment
+python3 -m venv env
+
+if [[ ! -d ./env ]]; then
+  abort "Error: Directory \`$(pwd)/env\` doesn't exist."
+fi
+
+# Activate virtual environment
+source env/bin/activate
+if [[ $? -ne 0 ]]; then
   abort "Failed to activate Python virtual environment."
 fi
 
-python3 -m pip install --upgrade pip setuptools wheel virtualenv # Use `python -m pip cache purge` if you've troubles
-# if ! pip show requests &>/dev/null; then
-#   echo "Installing requests..."
-#   pip install requests
-# fi
-python3 -m pip install -r requirements.txt # python -m pip install -r requirements-dev.txt
+echo "✅ Virtual environment activated"
 
-# ------------------------------------------------------------------------------
-# 👮‍♀️ Rights Policy
-# ------------------------------------------------------------------------------
+# Upgrade pip and install dependencies
+echo "Installing Python dependencies..."
+python3 -m pip install --upgrade pip setuptools wheel virtualenv
+python3 -m pip install -r requirements.txt
 
-[[ -f ./BANG  ]] && chmod u+x ./BANG
+echo "✅ Python dependencies installed"
+
+# ==============================================================================
+# 🦀 R U S T  M O D U L E  B U I L D
+# ==============================================================================
+
+echo "Building Rust price calculator module..."
+div
+
+# Check if Rust is installed
+if ! command -v cargo &> /dev/null; then
+  echo "Installing Rust..."
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  source "$HOME/.cargo/env"
+fi
+
+# Build Rust module
+cd rust_modules/price_calculator
+echo "Compiling Rust module with PyO3..."
+cargo build --release
+
+# Install the Python module
+pip install maturin
+maturin develop --release
+
+cd ../../
+echo "✅ Rust module built and installed"
+
+# ==============================================================================
+# 🔧 R E D I S  S E T U P
+# ==============================================================================
+
+echo "Checking Redis availability..."
+div
+
+# Check if Redis is available
+if command -v redis-server &> /dev/null; then
+  echo "✅ Redis is available"
+  # Try to ping Redis
+  if redis-cli ping &> /dev/null; then
+    echo "✅ Redis is running"
+  else
+    echo "⚠️  Redis is installed but not running. You may need to start it manually:"
+    echo "   sudo systemctl start redis-server"
+    echo "   or use Docker: docker run -d -p 6379:6379 redis:7.0"
+  fi
+else
+  echo "⚠️  Redis is not installed. Install options:"
+  echo "   Ubuntu: sudo apt install redis-server"
+  echo "   Docker: docker run -d -p 6379:6379 redis:7.0"
+  echo "   macOS:  brew install redis"
+fi
+
+# ==============================================================================
+# 🌐 F R O N T E N D  S E T U P
+# ==============================================================================
+
+echo "Setting up frontend dependencies..."
+div
+
+if [[ -d frontend ]]; then
+  cd frontend
+  
+  # Check if Node.js is available
+  if command -v node &> /dev/null; then
+    NODE_VERSION=$(node --version)
+    echo "✅ Node.js version: $NODE_VERSION"
+    
+    # Install dependencies
+    if command -v pnpm &> /dev/null; then
+      echo "Using pnpm for package management..."
+      pnpm install
+    else
+      echo "Using npm for package management..."
+      npm install
+    fi
+    
+    echo "✅ Frontend dependencies installed"
+  else
+    echo "⚠️  Node.js is not installed. Please install Node.js 22.x or 24.7.0"
+    echo "   Download from: https://nodejs.org/"
+  fi
+  
+  cd ..
+else
+  echo "⚠️  Frontend directory not found"
+fi
+
+# ==============================================================================
+# 📝 P E R M I S S I O N S
+# ==============================================================================
+
+echo "Setting up file permissions..."
+div
+
+# Make scripts executable
+[[ -f ./BANG ]] && chmod u+x ./BANG
 [[ -f ./BUILD ]] && chmod u+x ./BUILD
-[[ -f ./SAVE  ]] && chmod u+x ./SAVE
+[[ -f ./SAVE ]] && chmod u+x ./SAVE
+[[ -f ./deploy.sh ]] && chmod u+x ./deploy.sh
+[[ -f ./deploy.pt1.sh ]] && chmod u+x ./deploy.pt1.sh
+
+echo "✅ File permissions set"
+
+# ==============================================================================
+# 📋 D E P L O Y M E N T  S U M M A R Y
+# ==============================================================================
+
+echo "Deployment Summary:"
+div
+echo "✅ Python virtual environment: $(pwd)/env"
+echo "✅ Dependencies installed from requirements.txt"
+echo "✅ Rust price calculator module built"
+echo "✅ Configuration file: $(pwd)/.env"
+echo "✅ Executable permissions set"
+
+if [[ -f .env ]]; then
+  echo ""
+  echo "📝 Next steps:"
+  echo "   1. Edit .env file with your actual Saleor API credentials"
+  echo "   2. Start Redis if not running: redis-server or docker run -d -p 6379:6379 redis:7.0"
+  echo "   3. Run the application: ./BANG"
+fi
+
+echo ""
+echo "🚀 Deployment completed successfully!"
+echo "   Run \`./BANG\` to start the application"
 
 # ==============================================================================
 # 🚧 T E R M I N A T E
@@ -76,7 +237,7 @@ deactivate && error_code=0
 exit $error_code # 🔳 Q.E.D.
 
 # ==============================================================================
-# 🧷 A L S O
+# 🧷 R E F E R E N C E S
 # ==============================================================================
 
 # - https://www.shellcheck.net/

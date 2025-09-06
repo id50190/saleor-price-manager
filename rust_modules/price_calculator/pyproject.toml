@@ -1,0 +1,21 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "price_calculator"
+version = "0.1.0"
+description = "High-performance price calculation module for Saleor Price Manager"
+authors = [
+    {name = "Saleor Price Manager", email = "dev@example.com"},
+]
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+[tool.maturin]
+module-name = "price_calculator"
+features = ["pyo3/extension-module"]

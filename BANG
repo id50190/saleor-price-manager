@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-echo "$0: Script started at $(date)"
+echo "$0: Application startup at $(date)"
 
 # ==============================================================================
 # 🔥 I N I T I A L I Z E
@@ -12,7 +12,7 @@ echo "$0: Script started at $(date)"
 # ⚙️ S E T T I N G S
 # ==============================================================================
 
-set -eu || set -o errexit && set -o nounset; set -o pipefail; set +o history # Use `set -o` to list all shell settings # https://www.gnu.org/software/bash/manual/html_node/
+set -eu || set -o errexit && set -o nounset; set -o pipefail; set +o history
 
 cd "$(dirname "$0")" && SCRIPT_DIR="$(pwd)"
 DIVIDER="$(printf '=%.0s' {1..80})" && div() {
@@ -21,65 +21,151 @@ DIVIDER="$(printf '=%.0s' {1..80})" && div() {
 }
 VERBOSE=true
 UNATTENDED=false
-error_code=1 # Praesumptio
-ending=Done.
+error_code=1
+ending="Application terminated."
 
 abort() {
-  ending=$1
-  exit ${2:-1} # Default error code is 1 (common)
+  ending="$1"
+  exit ${2:-1}
 }
 
-cadence() { # Callback
-  set +eu || set +o errexit && set +o nounset; set +o pipefail; set -o history # Use `set -o` to list all shell settings
-  [[ $error_code -ne 0 && "$ending" == Done. ]] && ending='An error occurred during execution!'
+cadence() {
+  set +eu || set +o errexit && set +o nounset; set +o pipefail; set -o history
+  [[ $error_code -ne 0 && "$ending" == "Application terminated." ]] && ending='An error occurred during application startup!'
   [[ -v ending && ! -z "$ending" ]] && echo "$0: $ending"
-}; trap cadence EXIT # Set the signal handler EXIT (to ensure a graceful cadence)
+}; trap cadence EXIT
 
 # ==============================================================================
 # 🧬 P R E R E Q U I S I T E S
 # ==============================================================================
 
-[[ -v http_proxy ]] && unset http_proxy; [[ -v https_proxy ]] && unset https_proxy; [[ -v all_proxy ]] && unset all_proxy; [[ -v HTTP_PROXY ]] && unset HTTP_PROXY; [[ -v HTTPS_PROXY ]] && unset HTTPS_PROXY; [[ -v ALL_PROXY ]] && unset ALL_PROXY; [[ ! -v http_proxy && ! -v https_proxy && ! -v all_proxy && ! -v HTTP_PROXY && ! -v HTTPS_PROXY && ! -v ALL_PROXY ]] && echo 'Environment variables for proxying have been reset!'
+# Clear proxy environment variables
+[[ -v http_proxy ]] && unset http_proxy; [[ -v https_proxy ]] && unset https_proxy; [[ -v all_proxy ]] && unset all_proxy; [[ -v HTTP_PROXY ]] && unset HTTP_PROXY; [[ -v HTTPS_PROXY ]] && unset HTTPS_PROXY; [[ -v ALL_PROXY ]] && unset ALL_PROXY
 
 cd "$(dirname "$0")"
 
 # ==============================================================================
-# 🐬 P R E F E R E N C E S
+# 🐳 E N V I R O N M E N T  L O A D I N G
 # ==============================================================================
 
-# if [[ ! -f ./.env ]]; then
-#   ending="Error: File \`.env\` doesn’t exists in \`$(pwd)\` directory." && exit 1
-# fi
-# 
-# source ./.env; if [[ $? -ne 0 ]]; then
-#   ending="Failed to setup environment." && exit 1
-# fi
+echo "Loading environment configuration..."
+div
 
-# ==============================================================================
-# 💥 B A N G
-# ==============================================================================
-
-if [[ ! -d ./env ]]; then # Check the existence of a virtual environment (Python)
-  abort "Error: Directory \`$(pwd)/env\` doesn’t exists."
+if [[ ! -f ./.env ]]; then
+  abort "Error: File \`.env\` doesn't exist in \`$(pwd)\` directory. Please run \`./DEPLOY\` first."
 fi
 
-source env/bin/activate; if [[ $? -ne 0 ]]; then # Activate virtual environment (Python)
+# Load environment variables from .env
+set -a # Automatically export all variables
+source ./.env
+set +a
+
+echo "✅ Environment variables loaded"
+echo "   APP_URL: ${APP_URL}"
+echo "   SALEOR_API_URL: ${SALEOR_API_URL}"
+echo "   APPLICATION_HOST: ${APPLICATION_HOST}"
+echo "   APPLICATION_PORT: ${APPLICATION_PORT}"
+
+# ==============================================================================
+# 🐍 V I R T U A L  E N V I R O N M E N T
+# ==============================================================================
+
+echo "Activating Python virtual environment..."
+div
+
+if [[ ! -d ./env ]]; then
+  abort "Error: Directory \`$(pwd)/env\` doesn't exist. Please run \`./DEPLOY\` first."
+fi
+
+source env/bin/activate
+if [[ $? -ne 0 ]]; then
   abort 'Failed to activate Python virtual environment.'
 fi
 
-uvicorn main:app --reload --host "${APPLICATION_HOST}" --port "${APPLICATION_PORT}"
+echo "✅ Python virtual environment activated"
+echo "   Python: $(which python)"
+echo "   Pip: $(which pip)"
+
+# ==============================================================================
+# 🔧 D E P E N D E N C I E S  C H E C K
+# ==============================================================================
+
+echo "Checking application dependencies..."
+div
+
+# Check if Redis is accessible
+if command -v redis-cli &> /dev/null; then
+  if redis-cli -u "$REDIS_URL" ping &> /dev/null; then
+    echo "✅ Redis is accessible at $REDIS_URL"
+  else
+    echo "⚠️  Redis is not accessible at $REDIS_URL"
+    echo "   Please start Redis: redis-server or docker run -d -p 6379:6379 redis:7.0"
+    read -p "Continue anyway? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      abort "Redis is required for the application to function properly."
+    fi
+  fi
+else
+  echo "⚠️  Redis CLI not found, skipping connectivity check"
+fi
+
+# Check if Rust module is available
+echo "Checking Rust price calculator module..."
+if python -c "import rust_modules.price_calculator; print('Rust module loaded successfully')" 2>/dev/null; then
+  echo "✅ Rust price calculator module is available"
+else
+  echo "⚠️  Rust price calculator module not found"
+  echo "   This may affect price calculation performance"
+  echo "   Run \`./DEPLOY\` to rebuild the Rust module"
+fi
+
+# ==============================================================================
+# 🚀 A P P L I C A T I O N  S T A R T U P
+# ==============================================================================
+
+echo "Starting Saleor Price Manager..."
+div
+echo "📋 Application Configuration:"
+echo "   Host: ${APPLICATION_HOST}"
+echo "   Port: ${APPLICATION_PORT}"
+echo "   Reload: ${RELOAD:-true}"
+echo "   Debug: ${DEBUG:-true}"
+echo ""
+echo "🔗 API Endpoints will be available at:"
+echo "   Swagger UI:  http://${APPLICATION_HOST}:${APPLICATION_PORT}/docs"
+echo "   ReDoc:       http://${APPLICATION_HOST}:${APPLICATION_PORT}/redoc"
+echo "   Health:      http://${APPLICATION_HOST}:${APPLICATION_PORT}/health"
+echo ""
+echo "🚫 Press Ctrl+C to stop the application"
+div
+
+# Start the application
+if [[ "${RELOAD:-true}" == "true" ]]; then
+  # Development mode with auto-reload
+  uvicorn main:app --reload --host "${APPLICATION_HOST}" --port "${APPLICATION_PORT}"
+else
+  # Production mode
+  uvicorn main:app --host "${APPLICATION_HOST}" --port "${APPLICATION_PORT}" --workers 4
+fi
 
 # ==============================================================================
 # 🚧 T E R M I N A T E
 # ==============================================================================
 
+echo ""
+echo "🛑 Shutting down application..."
 deactivate
-exit $error_code # 🔳 Q.E.D.
+error_code=0
+ending="Application stopped gracefully."
+exit $error_code
 
 # ==============================================================================
-# 🧷 A L S O
+# 🧷 R E F E R E N C E S
 # ==============================================================================
 
 # - https://www.shellcheck.net/
 # - https://chmod-calculator.com/
 # - https://crontab.guru/
+# - https://docs.python.org/3/library/venv.html
+# - https://fastapi.tiangolo.com/deployment/manually/
