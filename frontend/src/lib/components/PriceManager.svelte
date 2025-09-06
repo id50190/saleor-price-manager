@@ -7,6 +7,7 @@
   import LoadingSpinner from './LoadingSpinner.svelte';
   import ErrorMessage from './ErrorMessage.svelte';
   import SubdomainSelector from './SubdomainSelector.svelte';
+  import ProductsManager from './ProductsManager.svelte';
   import { getSubdomainFromUrl } from '$lib/utils';
 
   let selectedSubdomain = getSubdomainFromUrl() || 'moscow';
@@ -174,6 +175,11 @@
       </div>
     </div>
   {/if}
+  
+  <!-- Products & Discounts Section -->
+  <div class="mt-8">
+    <ProductsManager {selectedSubdomain} />
+  </div>
   
   <div class="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">
     <p>💡 <strong class="text-gray-900 dark:text-gray-100">Demo Mode:</strong> Changes are simulated and won't persist</p>

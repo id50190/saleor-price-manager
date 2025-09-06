@@ -2,6 +2,8 @@
 from decimal import Decimal
 import asyncio
 from app.services.markup_service import markup_service
+from app.services.discount_service import discount_service
+from app.saleor.api import get_product
 
 # Импортируем Rust-модуль
 try:
@@ -31,13 +33,25 @@ def _python_calculate_price(base_price: str, markup_percent: str) -> str:
 
 async def calculate_price_with_markup(product_id: str, channel_id: str, base_price: Decimal) -> Decimal:
     """
-    Рассчитывает итоговую цену продукта с учетом наценки канала
+    Рассчитывает итоговую цену продукта с учетом наценки канала и активных скидок
     Использует Rust для высокой производительности или Python fallback
     """
     # Получаем наценку для канала
     markup_percent = await markup_service.get_channel_markup(channel_id)
     
-    # Используем Rust модуль если доступен, иначе Python
+    # Получаем данные продукта и его скидки
+    product = await get_product(product_id)
+    discounts_json = ""
+    if product and product.get("metadata"):
+        discounts_json = next(
+            (meta["value"] for meta in product["metadata"] if meta["key"] == "discounts"),
+            ""
+        )
+    
+    discounts = discount_service.parse_discounts(discounts_json)
+    active_discount = discount_service.get_active_discount(discounts)
+    
+    # Рассчитываем цену с наценкой
     if price_calculator:
         final_price = price_calculator.calculate_price(
             str(base_price), 
@@ -51,7 +65,13 @@ async def calculate_price_with_markup(product_id: str, channel_id: str, base_pri
             str(markup_percent)
         )
     
-    return Decimal(final_price)
+    final_price = Decimal(final_price)
+    
+    # Применяем скидку, если она активна
+    if active_discount:
+        final_price = discount_service.apply_discount(final_price, active_discount)
+    
+    return final_price
 
 def _python_batch_calculate(batch_data):
     """
