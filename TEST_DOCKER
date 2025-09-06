@@ -5,27 +5,50 @@ echo "$0: Running Docker-based tests at $(date)"
 set -eu
 cd "$(dirname "$0")"
 
+# Auto-detect Docker Compose command
+if command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE="docker-compose"
+  COMPOSE_VERSION=$(docker-compose --version 2>/dev/null || echo "unknown")
+  echo "🐳 Using docker-compose (v1): $COMPOSE_VERSION"
+elif docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE="docker compose"
+  COMPOSE_VERSION=$(docker compose version --short 2>/dev/null || echo "v2")
+  echo "🐳 Using docker compose (v2): $COMPOSE_VERSION"
+else
+  echo "❌ Error: Neither 'docker-compose' nor 'docker compose' is available!"
+  echo "Please install Docker Compose: https://docs.docker.com/compose/install/"
+  exit 1
+fi
+
+# Validate Docker Compose configuration
+echo "🔧 Validating Docker Compose configuration..."
+if ! $DOCKER_COMPOSE -f docker-compose.test.yml config --quiet 2>/dev/null; then
+  echo "❌ Error: Invalid docker-compose.test.yml configuration!"
+  echo "Run: $DOCKER_COMPOSE -f docker-compose.test.yml config"
+  exit 1
+fi
+
 TEST_TYPE=${1:-all}
 
 case $TEST_TYPE in
   "api")
     echo "🧪 Running API tests in Docker..."
-    docker-compose -f docker-compose.test.yml up --build redis-test api-test
-    docker-compose -f docker-compose.test.yml run --rm test-runner pytest tests/api/ --verbose
+    $DOCKER_COMPOSE -f docker-compose.test.yml up --build redis-test api-test
+    $DOCKER_COMPOSE -f docker-compose.test.yml run --rm test-runner pytest tests/api/ --verbose
     ;;
   "frontend")
     echo "🌐 Running frontend E2E tests in Docker..."
-    docker-compose -f docker-compose.test.yml --profile e2e up --build
+    $DOCKER_COMPOSE -f docker-compose.test.yml --profile e2e up --build
     ;;
   "integration")
     echo "🔄 Running integration tests in Docker..."
-    docker-compose -f docker-compose.test.yml up --build
-    docker-compose -f docker-compose.test.yml run --rm test-runner pytest tests/api/test_integration.py -m integration
+    $DOCKER_COMPOSE -f docker-compose.test.yml up --build
+    $DOCKER_COMPOSE -f docker-compose.test.yml run --rm test-runner pytest tests/api/test_integration.py -m integration
     ;;
   "all")
     echo "🚀 Running all tests in Docker..."
     # Start services
-    docker-compose -f docker-compose.test.yml up -d --build redis-test api-test frontend-test
+    $DOCKER_COMPOSE -f docker-compose.test.yml up -d --build redis-test api-test frontend-test
     
     # Wait for services to be healthy
     echo "⏳ Waiting for services to be ready..."
@@ -33,16 +56,16 @@ case $TEST_TYPE in
     
     # Run API tests
     echo "🧪 Running API tests..."
-    docker-compose -f docker-compose.test.yml run --rm test-runner pytest tests/api/ --verbose --cov=app
+    $DOCKER_COMPOSE -f docker-compose.test.yml run --rm test-runner pytest tests/api/ --verbose --cov=app
     API_EXIT_CODE=$?
     
     # Run E2E tests
     echo "🌐 Running E2E tests..."
-    docker-compose -f docker-compose.test.yml --profile e2e run --rm playwright-runner
+    $DOCKER_COMPOSE -f docker-compose.test.yml --profile e2e run --rm playwright-runner
     E2E_EXIT_CODE=$?
     
     # Cleanup
-    docker-compose -f docker-compose.test.yml down
+    $DOCKER_COMPOSE -f docker-compose.test.yml down
     
     # Check results
     if [[ $API_EXIT_CODE -ne 0 || $E2E_EXIT_CODE -ne 0 ]]; then

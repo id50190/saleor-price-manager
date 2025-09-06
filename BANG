@@ -158,12 +158,34 @@ if [[ "$START_FRONTEND" == "true" ]]; then
     cd ..
   fi
   
-  # Start frontend in background
+  # Sync backend host/port to frontend environment
+  echo "Syncing API configuration to frontend..."
+  API_HOST=${APPLICATION_HOST}
+  # Convert 0.0.0.0 to localhost for frontend (browser can't connect to 0.0.0.0)
+  # Keep 127.0.0.1 as is for consistency with backend
+  if [[ "$API_HOST" == "0.0.0.0" ]]; then
+    API_HOST="localhost"
+  fi
+  
+  cat > frontend/.env << EOF
+# Auto-generated from backend configuration
+VITE_API_BASE_URL=http://${API_HOST}:${APPLICATION_PORT}
+VITE_APP_TITLE="Saleor Price Manager"
+VITE_API_TIMEOUT=10000
+EOF
+  
+  echo "   Frontend will connect to: http://${API_HOST}:${APPLICATION_PORT}"
+  
+  # Start frontend in background with optimized settings
   cd frontend
+  
+  # Set reduced file watching to prevent OS limits
+  export VITE_DISABLE_FS_WATCHER=true
+  
   if command -v pnpm &> /dev/null; then
-    pnpm start &
+    pnpm dev &
   else
-    npm start &
+    npm run dev &
   fi
   FRONTEND_PID=$!
   cd ..
@@ -186,8 +208,14 @@ fi
 # Start the backend application
 echo "Starting backend API server..."
 if [[ "${RELOAD:-true}" == "true" ]]; then
-  # Development mode with auto-reload
-  uvicorn main:app --reload --host "${APPLICATION_HOST}" --port "${APPLICATION_PORT}"
+  # Development mode with auto-reload (exclude frontend to prevent file watch limits)
+  uvicorn main:app --reload --host "${APPLICATION_HOST}" --port "${APPLICATION_PORT}" \
+    --reload-exclude "frontend/*" \
+    --reload-exclude "frontend-react-backup/*" \
+    --reload-exclude "**/node_modules/*" \
+    --reload-exclude "**/.svelte-kit/*" \
+    --reload-exclude "**/__pycache__/*" \
+    --reload-exclude "**/.*"
 else
   # Production mode
   uvicorn main:app --host "${APPLICATION_HOST}" --port "${APPLICATION_PORT}" --workers 4

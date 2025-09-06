@@ -25,3 +25,4 @@ frontend/build/
 frontend/.env.local
 frontend/.env.production.local
 
+frontend-react-backup/

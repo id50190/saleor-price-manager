@@ -30,14 +30,40 @@ if [[ ! -d "node_modules" ]]; then
   fi
 fi
 
-echo "🚀 Starting React development server..."
+# Load environment configuration for API URL sync
+if [[ -f "../.env" ]]; then
+  echo "Syncing API configuration..."
+  source ../.env
+  API_HOST=${APPLICATION_HOST:-localhost}
+  # Convert 0.0.0.0 to localhost for frontend (browser can't connect to 0.0.0.0)
+  # Keep other hosts (127.0.0.1, specific IPs) as configured
+  if [[ "$API_HOST" == "0.0.0.0" ]]; then
+    API_HOST="localhost"
+  fi
+  
+  cat > .env << EOF
+# Auto-generated from backend configuration
+VITE_API_BASE_URL=http://${API_HOST}:${APPLICATION_PORT:-8000}
+VITE_APP_TITLE="Saleor Price Manager"
+VITE_API_TIMEOUT=10000
+EOF
+  
+  echo "   Frontend will connect to: http://${API_HOST}:${APPLICATION_PORT:-8000}"
+else
+  echo "   Using default API URL: http://localhost:8000"
+fi
+
+echo "🚀 Starting SvelteKit development server..."
 echo "🌐 Frontend will be available at: http://localhost:3000"
 echo "🚪 Press Ctrl+C to stop"
 echo
 
+# Optimize file watching to prevent OS limits
+export VITE_DISABLE_FS_WATCHER=true
+
 # Start the frontend
 if command -v pnpm &> /dev/null; then
-  pnpm start
+  pnpm dev
 else
-  npm start
+  npm run dev
 fi
