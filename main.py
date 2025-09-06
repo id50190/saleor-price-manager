@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from app.api import channels, prices, webhooks
+from app.api import channels, prices, webhooks, products
 from app.core.config import settings
 from app.saleor.client import init_saleor_client
 
@@ -47,6 +47,7 @@ async def add_process_time_header(request: Request, call_next):
 # Include routers
 app.include_router(channels.router, prefix='/api/channels', tags=['channels'])
 app.include_router(prices.router,   prefix='/api/prices',   tags=['prices'])
+app.include_router(products.router, prefix='/api/products', tags=['products'])
 app.include_router(webhooks.router, prefix='/webhooks',     tags=['webhooks'])
 
 @app.get('/health')

@@ -22,7 +22,7 @@ const getApiBaseUrl = () => {
   }
   
   // Server-side rendering fallback
-  return `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}`;
+  return `http://${host === '0.0.0.0' ? 'localhost' : host === '127.0.0.1' ? 'localhost' : host}:${port}`;
 };
 
 export const API_BASE_URL = getApiBaseUrl();

@@ -9,3 +9,5 @@ httpx>=0.25.0
 redis>=5.0.0
 pyjwt>=2.8.0
 maturin>=1.0.0
+croniter>=3.0.0
+pytz>=2023.3

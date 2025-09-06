@@ -15,6 +15,9 @@ router = APIRouter()
     This endpoint queries Saleor API for channel information and enriches it with
     markup data from Redis cache or Saleor metadata.
     
+    **Parameters:**
+    - subdomain (optional): Filter channels by subdomain value in metadata
+    
     **Returns:**
     - List of channels with markup information
     - Each channel includes: id, name, slug, markup_percent, metadata
@@ -29,20 +32,27 @@ router = APIRouter()
         500: {"description": "Internal server error"}
     }
 )
-async def list_channels():  # Временно убрали аутентификацию для demo
+async def list_channels_endpoint(subdomain: str = None):  # Временно убрали аутентификацию для demo
     """Get list of all channels with markup information"""
-    from app.saleor.api import list_channels
+    from app.saleor.api import list_channels, get_channel_by_subdomain
     
-    channels = await list_channels()
-    
-    # Add markup information to each channel
-    result = []
-    for channel in channels:
+    if subdomain:
+        # Фильтрация по поддомену
+        channel = await get_channel_by_subdomain(subdomain)
+        if not channel:
+            return []
         markup = await markup_service.get_channel_markup(channel["id"])
         channel["markup_percent"] = str(markup)
-        result.append(channel)
-        
-    return result
+        return [channel]
+    else:
+        # Возврат всех каналов
+        channels = await list_channels()
+        result = []
+        for channel in channels:
+            markup = await markup_service.get_channel_markup(channel["id"])
+            channel["markup_percent"] = str(markup)
+            result.append(channel)
+        return result
 
 @router.post(
     "/markup",

@@ -73,8 +73,8 @@
 <div class="channel-card">
   <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">🏠 {channel.name}</h3>
   <div class="text-sm text-gray-600 dark:text-gray-400 space-y-1 mb-6">
-    <p><strong>Slug:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">{channel.slug}</code></p>
-    <p><strong>Current Markup:</strong> 
+    <p><strong class="text-gray-900 dark:text-gray-100">Slug:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs text-gray-900 dark:text-gray-100">{channel.slug}</code></p>
+    <p><strong class="text-gray-900 dark:text-gray-100">Current Markup:</strong> 
       <span class="font-semibold text-primary-600 dark:text-primary-400">{channel.markup_percent}%</span>
     </p>
   </div>
