@@ -53,7 +53,7 @@ REDIS_URL=redis://localhost:6379/0
 - **🦀 Rust Module** - High-performance price calculations via PyO3
 - **📋 Redis** - Fast caching for markup data (optional)
 - **🌐 Saleor Integration** - GraphQL API client with webhook support
-- **⚙️ React Frontend** - Management interface for Saleor Dashboard
+- **⚙️ SvelteKit Frontend** - Modern TypeScript interface with dark/light themes
 
 ```mermaid
 graph TB
@@ -61,7 +61,7 @@ graph TB
     B -->|PyO3| C[Rust Price Calculator]
     B -->|Cache| D[Redis]
     B -->|Webhooks| E[Real-time Updates]
-    F[React Frontend] -->|API Calls| B
+    F[SvelteKit Frontend] -->|API Calls| B
 ```
 
 ---
@@ -75,7 +75,7 @@ graph TB
 ```
 
 **Demo Features:**
-- ✅ **React Frontend** - Visual channel management interface
+- ✅ **SvelteKit Frontend** - Modern TypeScript interface with theme support
 - ✅ **3 Sample Channels** - Default, Moscow Store, SPb Store
 - ✅ **Interactive Price Calculator** - Test markups in real-time
 - ✅ **Full API Documentation** - Swagger UI + ReDoc
@@ -128,7 +128,7 @@ curl -X POST http://localhost:8000/api/prices/calculate \
 ```bash
 ./BANG                # Start both backend + frontend
 ./BANG_BACKEND_ONLY   # Start only FastAPI backend
-./START_FRONTEND      # Start only React frontend
+./START_FRONTEND      # Start only SvelteKit frontend
 ```
 
 ### Building Rust Module
@@ -175,7 +175,7 @@ saleor-price-manager/
 │   └── services/            # Business logic services
 ├── rust_modules/            # High-performance Rust modules
 │   └── price_calculator/    # Price calculation engine
-├── frontend/                # React management interface
+├── frontend/                # SvelteKit TypeScript interface
 ├── scripts/                 # Utility scripts
 └── docs/                    # Documentation
 ```
