@@ -7,6 +7,87 @@ from app.core.security import verify_token
 router = APIRouter()
 
 @router.get(
+    "/test",
+    response_model=List[ChannelWithMarkup],
+    summary="Test new Saleor API integration",
+    description="Test endpoint for new Saleor API integration logic"
+)
+async def test_channels_endpoint(subdomain: str = None):
+    """Test new channels logic with real Saleor API"""
+    from app.saleor.api import settings
+    import httpx
+    
+    # Test connection to real Saleor API
+    if settings.SALEOR_API_URL and not settings.SALEOR_API_URL.endswith('your-instance.saleor.cloud/graphql/'):
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                # Test API connectivity
+                test_response = await client.post(
+                    settings.SALEOR_API_URL,
+                    json={"query": "query { shop { name } }"},
+                    headers={"Content-Type": "application/json"}
+                )
+                
+                if test_response.is_success:
+                    test_data = test_response.json()
+                    shop_name = test_data.get('data', {}).get('shop', {}).get('name', 'Unknown')
+                    
+                    # Try to get channels without token
+                    query = """
+                    query {
+                        channels {
+                            id
+                            name
+                            slug
+                            metadata {
+                                key
+                                value
+                            }
+                        }
+                    }
+                    """
+                    
+                    response = await client.post(
+                        settings.SALEOR_API_URL,
+                        json={"query": query},
+                        headers={"Content-Type": "application/json"}
+                    )
+                    data = response.json()
+                    
+                    if "errors" in data:
+                        # Return demo data based on real API structure
+                        return [
+                            {
+                                "id": "demo-connected-api",
+                                "name": f"Demo for {shop_name}",
+                                "slug": "demo-connected",
+                                "markup_percent": "0",
+                                "metadata": [
+                                    {"key": "price_markup_percent", "value": "0"},
+                                    {"key": "subdomains", "value": "demo,connected,api"},
+                                    {"key": "api_status", "value": "connected_no_auth"}
+                                ]
+                            }
+                        ]
+                    else:
+                        # Real channels from API
+                        channels = data.get("data", {}).get("channels", [])
+                        result = []
+                        for channel in channels:
+                            markup = "0"  # Default markup
+                            for meta in channel.get("metadata", []):
+                                if meta["key"] == "price_markup_percent":
+                                    markup = meta["value"]
+                                    break
+                            channel["markup_percent"] = markup
+                            result.append(channel)
+                        return result
+        except Exception as e:
+            return [{"id": "error", "name": f"API Error: {str(e)}", "slug": "error", "markup_percent": "0", "metadata": []}]
+    
+    return [{"id": "no-api", "name": "No API configured", "slug": "no-api", "markup_percent": "0", "metadata": []}]
+
+@router.get(
     "/",
     response_model=List[ChannelWithMarkup],
     summary="List All Channels",
