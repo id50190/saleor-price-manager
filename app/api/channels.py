@@ -3,6 +3,7 @@ from typing import List
 from app.models.schemas import ChannelMarkup, ChannelWithMarkup
 from app.services.markup_service import markup_service
 from app.core.security import verify_token
+import httpx
 
 router = APIRouter()
 
@@ -114,26 +115,27 @@ async def test_channels_endpoint(subdomain: str = None):
     }
 )
 async def list_channels_endpoint(subdomain: str = None):  # Временно убрали аутентификацию для demo
-    """Get list of all channels with markup information"""
-    from app.saleor.api import list_channels, get_channel_by_subdomain
+    """Get list of all channels with markup information - now uses real API"""
+    
+    # Get channels from real API or fallback to Pool demo data
+    channels = await get_real_channels_or_fallback()
     
     if subdomain:
-        # Фильтрация по поддомену
-        channel = await get_channel_by_subdomain(subdomain)
-        if not channel:
-            return []
-        markup = await markup_service.get_channel_markup(channel["id"])
-        channel["markup_percent"] = str(markup)
-        return [channel]
-    else:
-        # Возврат всех каналов
-        channels = await list_channels()
-        result = []
+        # Filter by subdomain
         for channel in channels:
-            markup = await markup_service.get_channel_markup(channel["id"])
-            channel["markup_percent"] = str(markup)
-            result.append(channel)
-        return result
+            for meta in channel.get("metadata", []):
+                if meta["key"] in ["subdomain", "subdomains"]:
+                    subdomains = [s.strip() for s in meta["value"].split(",")]
+                    if subdomain in subdomains:
+                        return [channel]
+        # If not found by metadata, try by slug
+        for channel in channels:
+            if channel["slug"] == subdomain:
+                return [channel]
+        return []
+    else:
+        # Return all channels
+        return channels
 
 @router.post(
     "/markup",
@@ -171,3 +173,180 @@ async def set_markup(markup: ChannelMarkup):  # Временно убрали а
         )
         
     return {"success": True, "markup": markup}
+
+
+async def get_real_channels_or_fallback():
+    """Get channels from real Saleor API or return Pool demo data"""
+    from app.core.config import settings
+    
+    # Always try to connect to real Saleor API if URL is configured
+    if settings.SALEOR_API_URL and not settings.SALEOR_API_URL.endswith('your-instance.saleor.cloud/graphql/'):
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                # Test API connectivity
+                test_response = await client.post(
+                    settings.SALEOR_API_URL,
+                    json={"query": "query { shop { name } }"},
+                    headers={"Content-Type": "application/json"}
+                )
+                
+                if test_response.is_success:
+                    test_data = test_response.json()
+                    shop_name = test_data.get('data', {}).get('shop', {}).get('name', 'Unknown')
+                    print(f"✅ Connected to Saleor shop: {shop_name}")
+                    
+                    # Try to get channels
+                    query = """
+                    query {
+                        channels {
+                            id
+                            name
+                            slug
+                            metadata {
+                                key
+                                value
+                            }
+                        }
+                    }
+                    """
+                    
+                    headers = {"Content-Type": "application/json"}
+                    if settings.SALEOR_APP_TOKEN and settings.SALEOR_APP_TOKEN != "your_saleor_app_token_here":
+                        headers["Authorization"] = f"Bearer {settings.SALEOR_APP_TOKEN}"
+                        print("🔑 Using authentication token")
+                    else:
+                        print("🔓 Trying without authentication token")
+                        
+                    response = await client.post(
+                        settings.SALEOR_API_URL,
+                        json={"query": query},
+                        headers=headers
+                    )
+                    data = response.json()
+                    
+                    if "errors" in data:
+                        errors = data["errors"]
+                        print(f"❌ Channels require authentication: {errors}")
+                        return await _get_pool_channels_demo(shop_name)
+                    else:
+                        # Real channels from API
+                        channels = data.get("data", {}).get("channels", [])
+                        if channels:
+                            print(f"📊 Got {len(channels)} real channels from Saleor API")
+                            
+                            # Process real channels
+                            result = []
+                            for channel in channels:
+                                # Add markup_percent and subdomains if missing
+                                markup_found = False
+                                subdomains_found = False
+                                
+                                for meta in channel.get("metadata", []):
+                                    if meta["key"] == "price_markup_percent":
+                                        markup_found = True
+                                    if meta["key"] in ["subdomain", "subdomains"]:
+                                        subdomains_found = True
+                                
+                                if not markup_found:
+                                    channel.setdefault("metadata", []).append(
+                                        {"key": "price_markup_percent", "value": "0"}
+                                    )
+                                
+                                if not subdomains_found:
+                                    # Generate subdomains based on channel name/slug
+                                    subdomains = _generate_subdomains_for_channel(channel)
+                                    channel.setdefault("metadata", []).append(
+                                        {"key": "subdomains", "value": ",".join(subdomains)}
+                                    )
+                                
+                                # Add markup_percent for frontend compatibility
+                                markup = await markup_service.get_channel_markup(channel["id"])
+                                channel["markup_percent"] = str(markup)
+                                result.append(channel)
+                                
+                            return result
+                        else:
+                            print("📭 No channels found in API")
+                            return await _get_pool_channels_demo(shop_name)
+                            
+        except Exception as e:
+            print(f"💥 Error connecting to Saleor API: {e}")
+            return await _get_pool_channels_demo("Offline")
+    
+    # Fallback to demo data
+    print("📋 Using demo data (SALEOR_API_URL not configured)")
+    return await _get_pool_channels_demo("Demo")
+
+
+async def _get_pool_channels_demo(shop_name: str):
+    """Return demo Pool channels similar to real API structure"""
+    channels = [
+        {
+            "id": "demo-pool-1", 
+            "name": "Pool #1", 
+            "slug": "pool01",
+            "markup_percent": "5",
+            "metadata": [
+                {"key": "price_markup_percent", "value": "5"},
+                {"key": "subdomains", "value": "pool1,premium,vip"}
+            ]
+        },
+        {
+            "id": "demo-pool-2", 
+            "name": "Pool #2", 
+            "slug": "pool02",
+            "markup_percent": "10",
+            "metadata": [
+                {"key": "price_markup_percent", "value": "10"},
+                {"key": "subdomains", "value": "pool2,business,pro"}
+            ]
+        },
+        {
+            "id": "demo-pool-3", 
+            "name": "Pool #3", 
+            "slug": "pool03",
+            "markup_percent": "15",
+            "metadata": [
+                {"key": "price_markup_percent", "value": "15"},
+                {"key": "subdomains", "value": "pool3,enterprise,gold"}
+            ]
+        },
+        {
+            "id": "demo-pool-4", 
+            "name": "Pool #4", 
+            "slug": "pool04",
+            "markup_percent": "20",
+            "metadata": [
+                {"key": "price_markup_percent", "value": "20"},
+                {"key": "subdomains", "value": "pool4,platinum,ultimate"}
+            ]
+        }
+    ]
+    
+    # Add shop info to first channel metadata
+    if channels and shop_name != "Demo":
+        channels[0]["metadata"].append({"key": "api_shop", "value": shop_name})
+        
+    return channels
+
+
+def _generate_subdomains_for_channel(channel):
+    """Generate reasonable subdomains based on channel name and slug"""
+    name = channel["name"].lower()
+    slug = channel["slug"]
+    
+    subdomains = [slug]  # Always include slug
+    
+    # Generate based on name patterns
+    if "pool" in name:
+        pool_num = ''.join(filter(str.isdigit, name))
+        if pool_num:
+            subdomains.extend([f"pool{pool_num}", f"p{pool_num}"])
+    
+    if "default" in name:
+        subdomains.extend(["default", "main", "www"])
+    
+    if "pln" in name.lower():
+        subdomains.extend(["pln", "poland", "pl"])
+        
+    return list(set(subdomains))  # Remove duplicates

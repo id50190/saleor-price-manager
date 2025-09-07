@@ -3,19 +3,54 @@
   import { getSubdomainFromUrl, setSubdomainParam, extractSubdomainsFromChannels, getChannelDisplayName } from '$lib/utils';
   import { api, type Channel } from '$lib/api/client';
   
-  export let selectedSubdomain: string = getSubdomainFromUrl() || 'moscow';
+  export let selectedChannel: Channel | null = null;
+  export let selectedSubdomain: string = getSubdomainFromUrl() || '';
   
   const dispatch = createEventDispatcher<{
     change: { subdomain: string }
   }>();
   
-  let availableSubdomains: string[] = ['moscow', 'spb', 'default']; // fallback
-  let channels: Channel[] = [];
-  let loading = true;
-  let error: string | null = null;
+  let availableSubdomains: string[] = [];
+  
+  // Extract subdomains from the selected channel
+  function updateAvailableSubdomains() {
+    if (!selectedChannel) {
+      availableSubdomains = [];
+      selectedSubdomain = '';
+      return;
+    }
+    
+    const channelSubdomains: string[] = [];
+    
+    for (const meta of selectedChannel.metadata || []) {
+      if (meta.key === 'subdomains' || meta.key === 'subdomain') {
+        const subdomains = meta.value.split(',').map(s => s.trim()).filter(s => s);
+        channelSubdomains.push(...subdomains);
+      }
+    }
+    
+    // Fallback to channel slug if no subdomains in metadata
+    if (channelSubdomains.length === 0) {
+      channelSubdomains.push(selectedChannel.slug);
+    }
+    
+    availableSubdomains = [...new Set(channelSubdomains)]; // Remove duplicates
+    
+    // Auto-select first subdomain if current selection is not available
+    if (availableSubdomains.length > 0 && !availableSubdomains.includes(selectedSubdomain)) {
+      selectedSubdomain = availableSubdomains[0];
+      setSubdomainParam(selectedSubdomain);
+      dispatch('change', { subdomain: selectedSubdomain });
+    }
+  }
+  
+  // React to channel changes
+  $: if (selectedChannel) {
+    updateAvailableSubdomains();
+  }
   
   function getSubdomainDisplayName(subdomain: string): string {
-    const channelName = getChannelDisplayName(subdomain, channels);
+    const channelName = selectedChannel?.name || subdomain;
     
     // Add icons for common subdomains
     const iconMap: Record<string, string> = {
@@ -44,38 +79,16 @@
     dispatch('change', { subdomain: newSubdomain });
   }
   
-  async function loadChannelsAndSubdomains() {
-    try {
-      loading = true;
-      error = null;
-      
-      channels = await api.getChannels();
-      availableSubdomains = extractSubdomainsFromChannels(channels);
-      
-      // If current selectedSubdomain is not in the list, use the first available
-      if (availableSubdomains.length > 0 && !availableSubdomains.includes(selectedSubdomain)) {
-        selectedSubdomain = availableSubdomains[0];
-        setSubdomainParam(selectedSubdomain);
-        dispatch('change', { subdomain: selectedSubdomain });
-      }
-      
-    } catch (err) {
-      console.error('Failed to load channels:', err);
-      error = 'Failed to load channels';
-      // Keep fallback data
-    } finally {
-      loading = false;
+  // Initialize URL parameter on mount
+  function initializeUrlParam() {
+    if (typeof window !== 'undefined' && selectedSubdomain && !getSubdomainFromUrl()) {
+      setSubdomainParam(selectedSubdomain);
     }
   }
   
-  onMount(() => {
-    loadChannelsAndSubdomains();
-    
-    // Initialize URL parameter if not set
-    if (typeof window !== 'undefined' && !getSubdomainFromUrl()) {
-      setSubdomainParam(selectedSubdomain);
-    }
-  });
+  $: if (selectedSubdomain) {
+    initializeUrlParam();
+  }
 </script>
 
 <div class="subdomain-selector">
@@ -83,26 +96,14 @@
     🌎 Select Region/Channel:
   </label>
   
-  {#if loading}
-    <div class="animate-pulse">
-      <div class="h-10 bg-gray-200 dark:bg-gray-600 rounded-md"></div>
+  {#if !selectedChannel}
+    <div class="text-gray-500 text-sm p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
+      ⚠️ Please select a channel first
     </div>
-  {:else if error}
-    <div class="text-red-500 text-sm mb-2">
-      ⚠️ {error} (using fallback data)
+  {:else if availableSubdomains.length === 0}
+    <div class="text-yellow-600 text-sm p-3 bg-yellow-100 dark:bg-yellow-900/20 rounded-md">
+      ⚠️ No subdomains configured for this channel
     </div>
-    <select 
-      id="subdomain-select"
-      bind:value={selectedSubdomain}
-      on:change={handleSubdomainChange}
-      class="w-full px-3 py-2 border border-red-300 dark:border-red-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-    >
-      {#each availableSubdomains as subdomain}
-        <option value={subdomain}>
-          {getSubdomainDisplayName(subdomain)}
-        </option>
-      {/each}
-    </select>
   {:else}
     <select 
       id="subdomain-select"

@@ -7,10 +7,12 @@
   import LoadingSpinner from './LoadingSpinner.svelte';
   import ErrorMessage from './ErrorMessage.svelte';
   import SubdomainSelector from './SubdomainSelector.svelte';
+  import ChannelSelector from './ChannelSelector.svelte';
   import ProductsManager from './ProductsManager.svelte';
   import { getSubdomainFromUrl } from '$lib/utils';
 
-  let selectedSubdomain = getSubdomainFromUrl() || 'moscow';
+  let selectedChannel: Channel | null = null;
+  let selectedSubdomain = getSubdomainFromUrl() || '';
   let filteredBySubdomain = false;
 
   async function fetchChannels(subdomain?: string) {
@@ -81,9 +83,24 @@
     }
   }
 
+  function handleChannelChange(event: CustomEvent<{channel: Channel | null}>) {
+    selectedChannel = event.detail.channel;
+    // Reset subdomain when channel changes
+    selectedSubdomain = '';
+    if (selectedChannel) {
+      fetchChannels(); // Load all channels, let SubdomainSelector handle filtering
+    }
+  }
+
   function handleSubdomainChange(event: CustomEvent<{subdomain: string}>) {
     selectedSubdomain = event.detail.subdomain;
-    fetchChannels(selectedSubdomain);
+    if (selectedSubdomain) {
+      fetchChannels(selectedSubdomain);
+      filteredBySubdomain = true;
+    } else {
+      fetchChannels();
+      filteredBySubdomain = false;
+    }
   }
 
   // Load channels on component mount
@@ -95,8 +112,14 @@
 <div>
   <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">📊 Channel Management</h2>
   
+  <ChannelSelector 
+    bind:selectedChannelId={selectedChannel?.id}
+    on:change={handleChannelChange}
+  />
+  
   <SubdomainSelector 
     bind:selectedSubdomain
+    {selectedChannel}
     on:change={handleSubdomainChange}
   />
   
