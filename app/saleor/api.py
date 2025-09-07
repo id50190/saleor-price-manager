@@ -241,7 +241,9 @@ async def get_product_data(product_id: str):
         return data.get("data", {}).get("product")
 async def get_channel_by_subdomain(subdomain: str):
     """Получает канал по поддомену (поддерживает множественные subdomains)"""
-    channels = await list_channels()
+    # Используем ту же логику, что и endpoint /api/channels/
+    from app.api.channels import get_real_channels_or_fallback
+    channels = await get_real_channels_or_fallback()
     
     for channel in channels:
         for meta in channel.get("metadata", []):

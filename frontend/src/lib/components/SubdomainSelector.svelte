@@ -47,26 +47,42 @@
   // React to channel changes
   $: if (selectedChannel) {
     updateAvailableSubdomains();
+  } else {
+    // Clear subdomain when no channel selected
+    availableSubdomains = [];
+    if (selectedSubdomain) {
+      selectedSubdomain = '';
+      setSubdomainParam('');
+      dispatch('change', { subdomain: '' });
+    }
   }
   
   function getSubdomainDisplayName(subdomain: string): string {
-    const channelName = selectedChannel?.name || subdomain;
-    
-    // Add icons for common subdomains
+    // Add icons for pool subdomains
     const iconMap: Record<string, string> = {
-      'default': '🌐',
-      'main': '🌐', 
-      'www': '🌐',
-      'moscow': '🏢',
-      'msk': '🏢',
-      'ru-moscow': '🏢',
-      'spb': '🏛️',
-      'piter': '🏛️',
-      'leningrad': '🏛️'
+      // Pool #1 subdomains
+      'pool1': '🏊‍♀️',
+      'premium': '👑',
+      'vip': '⭐',
+      
+      // Pool #2 subdomains
+      'pool2': '🏊‍♂️',
+      'business': '💼',
+      'pro': '📈',
+      
+      // Pool #3 subdomains
+      'pool3': '🏊',
+      'enterprise': '🏢',
+      'gold': '🥇',
+      
+      // Pool #4 subdomains
+      'pool4': '🌊',
+      'platinum': '💎',
+      'ultimate': '🏆'
     };
     
     const icon = iconMap[subdomain.toLowerCase()] || '🌍';
-    return `${icon} ${channelName}`;
+    return `${icon} ${subdomain}`;
   }
   
   function handleSubdomainChange(event: Event) {
@@ -93,16 +109,16 @@
 
 <div class="subdomain-selector">
   <label for="subdomain-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-    🌎 Select Region/Channel:
+    🌍 Step 2: Select Subdomain for {selectedChannel?.name || 'selected pool'}:
   </label>
   
   {#if !selectedChannel}
     <div class="text-gray-500 text-sm p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
-      ⚠️ Please select a channel first
+      ⚠️ Please select a pool/channel first (Step 1)
     </div>
   {:else if availableSubdomains.length === 0}
     <div class="text-yellow-600 text-sm p-3 bg-yellow-100 dark:bg-yellow-900/20 rounded-md">
-      ⚠️ No subdomains configured for this channel
+      ⚠️ No subdomains configured for {selectedChannel.name}
     </div>
   {:else}
     <select 
@@ -111,6 +127,7 @@
       on:change={handleSubdomainChange}
       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
     >
+      <option value="">Choose subdomain for {selectedChannel.name}...</option>
       {#each availableSubdomains as subdomain}
         <option value={subdomain}>
           {getSubdomainDisplayName(subdomain)}

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
+from decimal import Decimal
 from app.models.schemas import PriceCalculationRequest, PriceCalculationResponse
 from app.services.price_calculator import calculate_price_with_markup, batch_calculate_prices
 from app.services.discount_service import discount_service
@@ -176,12 +177,21 @@ async def calculate_price_by_subdomain(
             )
         
         channel_id = channel["id"]
-        markup_percent = await markup_service.get_channel_markup(channel_id)
-        final_price = await calculate_price_with_markup(
-            product_id,
-            channel_id,
-            base_price
-        )
+        
+        # Получаем markup из метаданных канала (для demo каналов)
+        markup_percent = Decimal('0')
+        for meta in channel.get("metadata", []):
+            if meta["key"] == "price_markup_percent":
+                markup_percent = Decimal(meta["value"])
+                break
+        
+        # Если не нашли в метаданных, пробуем через markup_service
+        if markup_percent == 0:
+            markup_percent = await markup_service.get_channel_markup(channel_id)
+        
+        # Рассчитываем цену вручную, так как calculate_price_with_markup использует markup_service
+        final_price_decimal = Decimal(str(base_price)) * (Decimal('1') + markup_percent / Decimal('100'))
+        final_price = final_price_decimal.quantize(Decimal('0.01'))
         
         return PriceCalculationResponse(
             product_id=product_id,

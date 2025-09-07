@@ -6,8 +6,8 @@
   import ChannelCard from './ChannelCard.svelte';
   import LoadingSpinner from './LoadingSpinner.svelte';
   import ErrorMessage from './ErrorMessage.svelte';
-  import SubdomainSelector from './SubdomainSelector.svelte';
   import ChannelSelector from './ChannelSelector.svelte';
+  import SubdomainSelector from './SubdomainSelector.svelte';
   import ProductsManager from './ProductsManager.svelte';
   import { getSubdomainFromUrl } from '$lib/utils';
 
@@ -87,15 +87,18 @@
   function handleChannelChange(event: CustomEvent<{channel: Channel | null}>) {
     selectedChannel = event.detail.channel;
     selectedChannelId = selectedChannel?.id || null;
+    
     // Reset subdomain when channel changes
     selectedSubdomain = '';
+    
     if (selectedChannel) {
-      fetchChannels(); // Load all channels, let SubdomainSelector handle filtering
+      fetchChannels(); // Load all channels for display
     }
   }
 
   function handleSubdomainChange(event: CustomEvent<{subdomain: string}>) {
     selectedSubdomain = event.detail.subdomain;
+    
     if (selectedSubdomain) {
       fetchChannels(selectedSubdomain);
       filteredBySubdomain = true;
