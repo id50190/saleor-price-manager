@@ -57,28 +57,47 @@ def mock_saleor_api():
 
 @pytest.fixture
 def sample_channels():
-    """Sample channel data for tests"""
+    """Sample channel data for tests - Pool demo format expected by tests"""
     return [
         {
-            "id": "Q2hhbm5lbDox",
-            "name": "Default Channel",
-            "slug": "default-channel",
-            "markup_percent": "0",
-            "metadata": [{"key": "price_markup_percent", "value": "0"}]
+            "id": "demo-pool-1",
+            "name": "Pool #1",
+            "slug": "pool01",
+            "markup_percent": "5",
+            "metadata": [
+                {"key": "price_markup_percent", "value": "5"},
+                {"key": "subdomains", "value": "pool1,premium,vip"}
+            ]
         },
         {
-            "id": "Q2hhbm5lbDoy",
-            "name": "Moscow Store",
-            "slug": "moscow",
-            "markup_percent": "15",
-            "metadata": [{"key": "price_markup_percent", "value": "15"}]
-        },
-        {
-            "id": "Q2hhbm5lbDoz",
-            "name": "SPb Store",
-            "slug": "spb",
+            "id": "demo-pool-2",
+            "name": "Pool #2",
+            "slug": "pool02",
             "markup_percent": "10",
-            "metadata": [{"key": "price_markup_percent", "value": "10"}]
+            "metadata": [
+                {"key": "price_markup_percent", "value": "10"},
+                {"key": "subdomains", "value": "pool2,business,pro"}
+            ]
+        },
+        {
+            "id": "demo-pool-3",
+            "name": "Pool #3",
+            "slug": "pool03",
+            "markup_percent": "15",
+            "metadata": [
+                {"key": "price_markup_percent", "value": "15"},
+                {"key": "subdomains", "value": "pool3,enterprise,gold"}
+            ]
+        },
+        {
+            "id": "demo-pool-4",
+            "name": "Pool #4",
+            "slug": "pool04",
+            "markup_percent": "20",
+            "metadata": [
+                {"key": "price_markup_percent", "value": "20"},
+                {"key": "subdomains", "value": "pool4,platinum,ultimate"}
+            ]
         }
     ]
 
@@ -226,6 +245,12 @@ def mock_dependencies(monkeypatch, mock_redis, mock_saleor_api, mock_rust_module
     monkeypatch.setattr("app.saleor.api.get_channel", mock_saleor_api.get_channel)
     monkeypatch.setattr("app.saleor.api.update_channel_metadata", mock_saleor_api.update_channel_metadata)
     
+    # Mock the channels endpoint function to return our test data
+    async def mock_get_real_channels_or_fallback():
+        return sample_channels
+    
+    monkeypatch.setattr("app.api.channels.get_real_channels_or_fallback", mock_get_real_channels_or_fallback)
+    
     # Also mock the client initialization to prevent real API calls
     monkeypatch.setattr("app.saleor.client.init_saleor_client", AsyncMock())
     
@@ -239,3 +264,12 @@ def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+# Register custom pytest marks to avoid warnings
+pytest_plugins = []
+
+def pytest_configure(config):
+    """Configure pytest with custom markers"""
+    config.addinivalue_line("markers", "unit: mark test as a unit test")
+    config.addinivalue_line("markers", "integration: mark test as an integration test")
+    config.addinivalue_line("markers", "asyncio: mark test as async")

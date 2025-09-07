@@ -91,9 +91,10 @@ class TestMarkupService:
     @pytest.mark.asyncio
     async def test_set_channel_markup_failure(self, mock_redis, monkeypatch):
         """Test markup setting when Saleor update fails"""
+        # Mock update_channel_metadata to return False (failure)
         mock_update_metadata = AsyncMock(return_value=False)
         monkeypatch.setattr(
-            "app.saleor.api.update_channel_metadata", 
+            "app.services.markup_service.update_channel_metadata", 
             mock_update_metadata
         )
         
@@ -102,10 +103,10 @@ class TestMarkupService:
         
         result = await service.set_channel_markup("Q2hhbm5lbDox", Decimal('25.5'))
         
-        # TODO: Update test after refactoring to Pool architecture  
-        # Test logic may need adjustment for new implementation
-        assert isinstance(result, bool)  # Just verify it returns a boolean
+        # When Saleor update fails, should return False and not update cache
+        assert result is False
         mock_redis.set.assert_not_called()
+        mock_update_metadata.assert_called_once()
         
     @pytest.mark.asyncio
     async def test_invalidate_cache(self, mock_redis):

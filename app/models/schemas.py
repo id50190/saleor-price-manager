@@ -7,14 +7,14 @@ class ChannelMarkup(BaseModel):
     channel_id: str = Field(
         ..., 
         description="Base64 encoded Saleor channel ID",
-        example="Q2hhbm5lbDox"
+        json_schema_extra={"example": "Q2hhbm5lbDox"}
     )
     markup_percent: Decimal = Field(
         ..., 
         ge=0, 
         le=1000,
         description="Markup percentage to apply (0-1000)",
-        example=15.5
+        json_schema_extra={"example": 15.5}
     )
     
     @field_validator('markup_percent')
@@ -62,19 +62,19 @@ class PriceCalculationRequest(BaseModel):
         ..., 
         min_length=1,
         description="Base64 encoded Saleor product ID",
-        example="UHJvZHVjdDox"
+        json_schema_extra={"example": "UHJvZHVjdDox"}
     )
     channel_id: Optional[str] = Field(
         None, 
         min_length=1,
         description="Base64 encoded Saleor channel ID (optional if using subdomain)",
-        example="Q2hhbm5lbDox"
+        json_schema_extra={"example": "Q2hhbm5lbDox"}
     )
     base_price: Decimal = Field(
         ..., 
         gt=0,
         description="Base price before markup (must be positive)",
-        example=100.00
+        json_schema_extra={"example": 100.00}
     )
     
     model_config = ConfigDict(
@@ -123,17 +123,17 @@ class SaleorWebhookPayload(BaseModel):
     event_type: str = Field(
         ..., 
         description="Type of Saleor event",
-        example="PRODUCT_UPDATED"
+        json_schema_extra={"example": "PRODUCT_UPDATED"}
     )
     product_id: Optional[str] = Field(
         None, 
         description="Product ID for product-related events",
-        example="UHJvZHVjdDox"
+        json_schema_extra={"example": "UHJvZHVjdDox"}
     )
     channel_id: Optional[str] = Field(
         None, 
         description="Channel ID for channel-related events",
-        example="Q2hhbm5lbDox"
+        json_schema_extra={"example": "Q2hhbm5lbDox"}
     )
     data: Dict[str, Any] = Field(
         default_factory=dict,
@@ -160,12 +160,12 @@ class DiscountPeriod(BaseModel):
     datetime_start: str = Field(
         ..., 
         description="Start date in DD-MM-YYYYTHH:MM:SSZ format",
-        example="01-01-2025T00:00:00Z"
+        json_schema_extra={"example": "01-01-2025T00:00:00Z"}
     )
     datetime_end: str = Field(
         ..., 
         description="End date in DD-MM-YYYYTHH:MM:SSZ format",
-        example="31-12-2025T23:59:59Z"
+        json_schema_extra={"example": "31-12-2025T23:59:59Z"}
     )
     
     model_config = ConfigDict(
@@ -182,17 +182,17 @@ class ProductDiscount(BaseModel):
     percent: Decimal = Field(
         ..., 
         description="Discount percentage (+/-), positive for markup, negative for discount",
-        example=10
+        json_schema_extra={"example": 10}
     )
     cap: str = Field(
         ..., 
         description="Maximum/minimum price cap",
-        example="2000"
+        json_schema_extra={"example": "2000"}
     )
     shedule: str = Field(
         default="* * * * *",
         description="Cron schedule for when discount is active",
-        example="5 4 * * *"
+        json_schema_extra={"example": "5 4 * * *"}
     )
     period: Optional[DiscountPeriod] = Field(
         None,
