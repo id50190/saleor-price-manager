@@ -1,0 +1,16 @@
+{
+  "ignore_dirs": [
+    "frontend/node_modules",
+    "frontend/.svelte-kit", 
+    "frontend/build",
+    "frontend/dist",
+    "env",
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    "htmlcov",
+    "log",
+    "run",
+    "rust_modules/price_calculator/target"
+  ]
+}
