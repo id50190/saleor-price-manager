@@ -14,11 +14,11 @@
   
   function getChannelIcon(channelName: string): string {
     const name = channelName.toLowerCase();
-    if (name.includes('default')) return '🌐';
-    if (name.includes('pln') || name.includes('poland')) return '🇵🇱';
-    if (name.includes('pool') || name.includes('#')) return '🏊‍♂️';
-    if (name.includes('moscow')) return '🇷🇺';
-    if (name.includes('spb') || name.includes('petersburg')) return '🏛️';
+    if (name.includes('pool #1')) return '🏊‍♀️';
+    if (name.includes('pool #2')) return '🏊‍♂️';
+    if (name.includes('pool #3')) return '🏊';
+    if (name.includes('pool #4')) return '🌊';
+    if (name.includes('pool')) return '🏊‍♂️';
     return '📊';
   }
   
@@ -60,7 +60,7 @@
 
 <div class="channel-selector">
   <label for="channel-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-    📊 Select Channel:
+    🏊 Step 1: Select Pool/Channel:
   </label>
   
   {#if loading}
@@ -79,10 +79,10 @@
       on:change={handleChannelChange}
       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
     >
-      <option value="">Select a channel...</option>
+      <option value="">Select a pool...</option>
       {#each channels as channel}
         <option value={channel.id}>
-          {getChannelIcon(channel.name)} {channel.name} ({channel.slug})
+          {getChannelIcon(channel.name)} {channel.name} (Slug: {channel.slug}) - {channel.markup_percent}% markup
         </option>
       {/each}
     </select>
