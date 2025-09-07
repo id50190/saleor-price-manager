@@ -97,6 +97,9 @@ setup_test_environment() {
     # Activate virtual environment
     source env/bin/activate
     
+    # Set PYTHONPATH to include current directory
+    export PYTHONPATH="$PWD:$PYTHONPATH"
+    
     # Install/upgrade dependencies
     log_info "Installing/upgrading dependencies..."
     pip install --upgrade pip setuptools wheel > /dev/null 2>&1
@@ -191,7 +194,10 @@ run_api_tests() {
     for config in "${test_configs[@]}"; do
         log_info "Running $config tests..."
         
-        timeout $TEST_TIMEOUT pytest tests/api/ \
+        # Set PYTHONPATH for tests
+        export PYTHONPATH="$PWD:$PYTHONPATH"
+        
+        timeout $TEST_TIMEOUT python -m pytest tests/api/ \
             -m "$config" \
             --verbose \
             --cov=app \
