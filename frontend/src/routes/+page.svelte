@@ -25,6 +25,12 @@
           {API_ENDPOINTS.DOCS}
         </a>
       </p>
+      <p><strong class="text-gray-900 dark:text-gray-100">ReDoc:</strong> 
+        <a href="{API_ENDPOINTS.REDOC}" target="_blank" rel="noopener noreferrer" 
+           class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
+          {API_ENDPOINTS.REDOC}
+        </a>
+      </p>
       <p><strong class="text-gray-900 dark:text-gray-100">Health Check:</strong> 
         <a href="{API_ENDPOINTS.HEALTH}" target="_blank" rel="noopener noreferrer"
            class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
