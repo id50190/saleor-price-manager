@@ -121,8 +121,8 @@
   
   <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
     💡 URL parameter: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">?subdomain={selectedSubdomain}</code>
-    {#if channels.length > 0}
-      <span class="ml-2">• {channels.length} channel{channels.length === 1 ? '' : 's'} available</span>
+    {#if selectedChannel}
+      <span class="ml-2">• Channel: {selectedChannel.name}</span>
     {/if}
   </div>
 </div>
