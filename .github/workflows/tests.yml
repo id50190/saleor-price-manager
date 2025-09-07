@@ -1,18 +1,57 @@
-name: Tests
+name: CI/CD Pipeline
 
 on:
   push:
     branches: [ main, develop, sketch-wip ]
   pull_request:
     branches: [ main, develop ]
+  schedule:
+    # Run nightly tests at 02:00 UTC
+    - cron: '0 2 * * *'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  api-tests:
+  quick-check:
+    name: Quick Validation
     runs-on: ubuntu-latest
+    outputs:
+      changed-files: ${{ steps.changes.outputs.files }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+    
+    - name: Get changed files
+      id: changes
+      run: |
+        echo "files=$(git diff --name-only HEAD~1 HEAD | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_OUTPUT
+    
+    - name: Quick validation checks
+      run: |
+        echo "🔍 Running quick validation..."
+        if [ -f "./TEST" ]; then
+          chmod +x ./TEST
+          ./TEST quick
+        else
+          echo "❌ TEST script not found"
+          exit 1
+        fi
+
+  api-tests:
+    name: API Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    needs: quick-check
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+        redis-version: ['7.0', '7.2']
     
     services:
       redis:
-        image: redis:7.0
+        image: redis:${{ matrix.redis-version }}
         ports:
           - 6379:6379
         options: >-
@@ -24,67 +63,90 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python 3.11
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: ${{ matrix.python-version }}
     
     - name: Set up Rust
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         override: true
+        components: rustfmt, clippy
     
-    - name: Cache Python dependencies
+    - name: Cache dependencies
       uses: actions/cache@v3
       with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        path: |
+          ~/.cache/pip
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ${{ runner.os }}-deps-${{ matrix.python-version }}-${{ hashFiles('**/requirements*.txt', '**/Cargo.toml') }}
         restore-keys: |
-          ${{ runner.os }}-pip-
+          ${{ runner.os }}-deps-${{ matrix.python-version }}-
+          ${{ runner.os }}-deps-
     
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
+        python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.txt
         pip install -r requirements-dev.txt
     
-    - name: Build Rust module
+    - name: Build and test Rust module
       run: |
         cd rust_modules/price_calculator
-        cargo build --release
-        pip install maturin
-        maturin develop --release
+        cargo fmt -- --check
+        cargo clippy -- -D warnings
+        cargo test
         cd ../..
+        ./BUILD
     
-    - name: Run API tests
+    - name: Run API tests with coverage
       run: |
-        pytest tests/api/ --verbose --cov=app --cov-report=xml --cov-report=term-missing
+        pytest tests/api/ --verbose --cov=app --cov-report=xml --cov-report=html --cov-report=term-missing --junitxml=junit.xml
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
-        flags: api-tests
-        name: codecov-umbrella
+        flags: api-tests-py${{ matrix.python-version }}-redis${{ matrix.redis-version }}
+        name: API Tests Coverage
+    
+    - name: Archive test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: api-test-results-py${{ matrix.python-version }}
+        path: |
+          junit.xml
+          htmlcov/
+          coverage.xml
 
   frontend-tests:
+    name: Frontend Tests (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    needs: quick-check
+    strategy:
+      matrix:
+        node-version: ['18', '22', '24']
+        browser: ['chromium', 'firefox']
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Node.js
+    - name: Set up Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
       with:
-        node-version: '22'
+        node-version: ${{ matrix.node-version }}
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
     
     - name: Set up Python for backend
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.12'
     
     - name: Set up Rust
       uses: actions-rs/toolchain@v1
@@ -98,49 +160,162 @@ jobs:
         pip install -r requirements.txt
     
     - name: Build Rust module
-      run: |
-        cd rust_modules/price_calculator
-        cargo build --release
-        pip install maturin
-        maturin develop --release
-        cd ../..
+      run: ./BUILD
     
     - name: Install frontend dependencies
       run: |
         cd frontend
         npm ci
-        npx playwright install --with-deps
+        npx playwright install --with-deps ${{ matrix.browser }}
     
-    - name: Run frontend tests
+    - name: Lint frontend code
       run: |
         cd frontend
-        npx playwright test --reporter=github
+        npm run lint
+        npm run check
+    
+    - name: Start backend for E2E tests
+      run: |
+        ./BANG_BACKEND_ONLY &
+        sleep 10
+        curl -f http://localhost:8000/health || exit 1
+      
+    - name: Run frontend E2E tests
+      run: |
+        cd frontend
+        npx playwright test --project=${{ matrix.browser }} --reporter=github
     
     - name: Upload Playwright report
       uses: actions/upload-artifact@v3
       if: failure()
       with:
-        name: playwright-report
+        name: playwright-report-node${{ matrix.node-version }}-${{ matrix.browser }}
         path: frontend/playwright-report/
-        retention-days: 30
+        retention-days: 10
 
-  integration-tests:
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: quick-check
+    permissions:
+      security-events: write
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Python security scan with bandit
+      run: |
+        pip install bandit[toml]
+        bandit -r app/ -f json -o bandit-report.json || true
+    
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-scan-results
+        path: |
+          trivy-results.sarif
+          bandit-report.json
+
+  performance-test:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    needs: [api-tests]
+    if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[perf-test]')
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install locust
+    
+    - name: Build application
+      run: ./BUILD
+    
+    - name: Start application
+      run: |
+        ./BANG_BACKEND_ONLY &
+        sleep 10
+    
+    - name: Run performance tests
+      run: |
+        # Create a simple locust test
+        cat << 'EOF' > locustfile.py
+        from locust import HttpUser, task, between
+        
+        class PriceManagerUser(HttpUser):
+            wait_time = between(1, 3)
+            
+            @task(3)
+            def test_health(self):
+                self.client.get("/health")
+            
+            @task(2)
+            def test_channels(self):
+                self.client.get("/api/channels/")
+            
+            @task(1)
+            def test_price_calculation(self):
+                self.client.post("/api/prices/calculate", json={
+                    "product_id": "UHJvZHVjdDox",
+                    "channel_id": "Q2hhbm5lbDoy",
+                    "base_price": 100.0
+                })
+        EOF
+        
+        # Run load test
+        locust -f locustfile.py --host=http://localhost:8000 --users 10 --spawn-rate 2 --run-time 60s --headless --html perf-report.html
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-test-results
+        path: perf-report.html
+
+  integration-test:
+    name: Integration Tests
     runs-on: ubuntu-latest
     needs: [api-tests, frontend-tests]
     
     services:
       redis:
-        image: redis:7.0
+        image: redis:7.2
         ports:
           - 6379:6379
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python 3.11
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.12'
     
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -157,15 +332,170 @@ jobs:
     
     - name: Deploy application
       run: |
+        chmod +x ./DEPLOY ./BANG ./TEST
         ./DEPLOY
     
     - name: Run integration tests
       run: |
         pytest tests/api/test_integration.py -m integration --verbose
     
-    - name: Test application startup
+    - name: Test full application startup
       run: |
-        timeout 30s ./BANG &
-        sleep 10
+        timeout 60s ./BANG &
+        APP_PID=$!
+        sleep 15
+        
+        # Test backend endpoints
         curl -f http://localhost:8000/health
         curl -f http://localhost:8000/api/channels/
+        curl -f http://localhost:8000/docs
+        
+        # Test frontend (if available)
+        if curl -f http://localhost:3000 2>/dev/null; then
+          echo "✅ Frontend is accessible"
+        else
+          echo "⚠️  Frontend not accessible (may be expected in CI)"
+        fi
+        
+        # Cleanup
+        kill $APP_PID || true
+
+  docker-build:
+    name: Docker Build & Test
+    runs-on: ubuntu-latest
+    needs: quick-check
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: false
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Test Docker image
+      run: |
+        # Test that the container starts and responds
+        docker run --rm -d --name test-app -p 8000:8000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
+        sleep 10
+        
+        # Test health endpoint
+        curl -f http://localhost:8000/health
+        
+        # Cleanup
+        docker stop test-app
+    
+    - name: Run Docker-based tests
+      run: |
+        if [ -f "./TEST_DOCKER" ]; then
+          chmod +x ./TEST_DOCKER
+          ./TEST_DOCKER api
+        fi
+
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    needs: quick-check
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install Python analysis tools
+      run: |
+        pip install flake8 black mypy pylint
+    
+    - name: Run Python linting
+      run: |
+        flake8 app/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 app/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Check Python formatting
+      run: |
+        black --check app/ tests/
+    
+    - name: Set up Node.js for frontend analysis
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Run frontend linting
+      run: |
+        cd frontend
+        npm run lint
+        npm run check
+    
+    - name: SonarCloud Scan
+      if: github.event_name != 'schedule'
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [api-tests, frontend-tests, integration-test, security-scan, docker-build]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment: staging
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to staging
+      run: |
+        echo "🚀 Deploying to staging environment..."
+        # Add actual deployment logic here
+        echo "✅ Staging deployment completed"
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [api-tests, frontend-tests, integration-test, security-scan, docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to production
+      run: |
+        echo "🚀 Deploying to production environment..."
+        # Add actual deployment logic here
+        echo "✅ Production deployment completed"
+
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [api-tests, frontend-tests, integration-test, security-scan, docker-build, code-quality]
+    if: always()
+    
+    steps:
+    - name: Summary
+      run: |
+        echo "🎯 CI/CD Pipeline Summary:"
+        echo "- Repository: ${{ github.repository }}"
+        echo "- Branch: ${{ github.ref_name }}"
+        echo "- Commit: ${{ github.sha }}"
+        echo "- Event: ${{ github.event_name }}"
+        echo "✅ Pipeline execution completed"

@@ -1,0 +1,570 @@
+#!/usr/bin/bash
+
+# Comprehensive test runner for Saleor Price Manager
+# This script runs all test categories with proper setup and teardown
+
+echo "$0: Comprehensive Testing Suite for Saleor Price Manager at $(date)"
+echo "================================================================================="
+
+set -eu
+cd "$(dirname "$0")"
+
+# Configuration
+TEST_TYPE=${1:-all}
+VERBOSE=${VERBOSE:-false}
+COVERAGE_THRESHOLD=${COVERAGE_THRESHOLD:-75}
+MAX_RETRIES=${MAX_RETRIES:-3}
+TEST_TIMEOUT=${TEST_TIMEOUT:-300}
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Helper functions
+log_info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+}
+
+log_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+log_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+log_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+# Cleanup function
+cleanup() {
+    log_info "Cleaning up test processes..."
+    pkill -f "uvicorn" || true
+    pkill -f "python.*main.py" || true
+    pkill -f "npm.*dev" || true
+    pkill -f "vite" || true
+    
+    # Clean up test files
+    rm -f locustfile.py junit-*.xml .coverage
+    rm -rf .pytest_cache htmlcov-* playwright-report-*
+    
+    log_success "Cleanup completed"
+}
+
+# Set up trap for cleanup
+trap cleanup EXIT INT TERM
+
+# Test environment setup
+setup_test_environment() {
+    log_info "Setting up test environment..."
+    
+    # Check required tools
+    local missing_tools=()
+    
+    command -v python3 >/dev/null || missing_tools+=("python3")
+    command -v node >/dev/null || missing_tools+=("node")
+    command -v npm >/dev/null || missing_tools+=("npm")
+    
+    if [ ${#missing_tools[@]} -ne 0 ]; then
+        log_error "Missing required tools: ${missing_tools[*]}"
+        exit 1
+    fi
+    
+    # Check Python version
+    python_version=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2)
+    if [[ "$python_version" < "3.11" ]]; then
+        log_error "Python 3.11+ required, found $python_version"
+        exit 1
+    fi
+    
+    # Check Node.js version
+    node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+    if [ "$node_version" -lt 18 ]; then
+        log_error "Node.js 18+ required, found v$node_version"
+        exit 1
+    fi
+    
+    # Setup virtual environment if needed
+    if [ ! -d "env" ]; then
+        log_info "Creating Python virtual environment..."
+        python3 -m venv env
+    fi
+    
+    # Activate virtual environment
+    source env/bin/activate
+    
+    # Install/upgrade dependencies
+    log_info "Installing/upgrading dependencies..."
+    pip install --upgrade pip setuptools wheel > /dev/null 2>&1
+    pip install -r requirements.txt > /dev/null 2>&1
+    pip install -r requirements-dev.txt > /dev/null 2>&1
+    
+    # Install additional test tools
+    pip install locust bandit[toml] safety > /dev/null 2>&1
+    
+    log_success "Test environment ready"
+}
+
+# Quick validation tests
+run_quick_tests() {
+    log_info "Running quick validation tests..."
+    
+    # File structure checks
+    local required_files=(
+        "main.py"
+        "requirements.txt"
+        "app/core/config.py"
+        "frontend/package.json"
+        "rust_modules/price_calculator/Cargo.toml"
+    )
+    
+    for file in "${required_files[@]}"; do
+        if [ ! -f "$file" ]; then
+            log_error "Required file missing: $file"
+            return 1
+        fi
+    done
+    
+    # Check executable permissions
+    local scripts=("DEPLOY" "BANG" "BUILD" "TEST")
+    for script in "${scripts[@]}"; do
+        if [ -f "$script" ] && [ ! -x "$script" ]; then
+            log_warning "Making $script executable"
+            chmod +x "$script"
+        fi
+    done
+    
+    # Python syntax check
+    python3 -m py_compile main.py
+    find app tests -name "*.py" -exec python3 -m py_compile {} \;
+    
+    log_success "Quick validation passed"
+}
+
+# Rust module tests
+run_rust_tests() {
+    log_info "Running Rust module tests..."
+    
+    cd rust_modules/price_calculator
+    
+    # Check Rust installation
+    if ! command -v cargo >/dev/null 2>&1; then
+        log_warning "Rust not found, installing..."
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source ~/.cargo/env
+    fi
+    
+    # Format check
+    cargo fmt -- --check || {
+        log_warning "Rust code formatting issues found"
+        cargo fmt
+    }
+    
+    # Lint check
+    cargo clippy -- -D warnings
+    
+    # Run tests
+    cargo test --verbose
+    
+    # Build release version
+    cargo build --release
+    
+    cd ../..
+    
+    # Build Python extension
+    ./BUILD
+    
+    log_success "Rust module tests passed"
+}
+
+# API tests with comprehensive coverage
+run_api_tests() {
+    log_info "Running API tests with coverage..."
+    
+    # Run tests with multiple configurations
+    local test_configs=("unit" "integration")
+    
+    for config in "${test_configs[@]}"; do
+        log_info "Running $config tests..."
+        
+        timeout $TEST_TIMEOUT pytest tests/api/ \
+            -m "$config" \
+            --verbose \
+            --cov=app \
+            --cov-report=html:htmlcov-$config \
+            --cov-report=xml:coverage-$config.xml \
+            --cov-report=term-missing \
+            --cov-fail-under=$COVERAGE_THRESHOLD \
+            --junitxml=junit-$config.xml \
+            --tb=short \
+            --maxfail=5 || {
+            
+            log_error "$config tests failed"
+            return 1
+        }
+    done
+    
+    log_success "API tests completed"
+}
+
+# Frontend tests with multiple browsers and environments
+run_frontend_tests() {
+    log_info "Running frontend tests..."
+    
+    cd frontend
+    
+    # Install dependencies if needed
+    if [ ! -d "node_modules" ] || [ package.json -nt node_modules/.package-lock.json ]; then
+        log_info "Installing frontend dependencies..."
+        npm ci
+    fi
+    
+    # Install Playwright browsers with system dependencies
+    log_info "Setting up Playwright browsers..."
+    npx playwright install --with-deps
+    
+    # Lint checks
+    log_info "Running frontend linting..."
+    npm run lint
+    npm run check
+    
+    # Start backend for E2E tests
+    log_info "Starting backend for E2E tests..."
+    cd ..
+    ./BANG_BACKEND_ONLY &
+    BACKEND_PID=$!
+    
+    # Wait for backend to be ready
+    local retry_count=0
+    while ! curl -sf http://localhost:8000/health >/dev/null 2>&1; do
+        if [ $retry_count -ge 30 ]; then
+            log_error "Backend failed to start within 30 seconds"
+            kill $BACKEND_PID || true
+            return 1
+        fi
+        sleep 1
+        ((retry_count++))
+    done
+    
+    log_success "Backend is ready for E2E tests"
+    
+    cd frontend
+    
+    # Run tests with different browsers
+    local browsers=("chromium" "firefox")
+    
+    for browser in "${browsers[@]}"; do
+        log_info "Running E2E tests with $browser..."
+        
+        timeout $TEST_TIMEOUT npx playwright test \
+            --project="$browser" \
+            --reporter=html:playwright-report-$browser \
+            --reporter=github || {
+            
+            log_error "E2E tests failed for $browser"
+            kill $BACKEND_PID || true
+            return 1
+        }
+    done
+    
+    # Cleanup backend
+    kill $BACKEND_PID || true
+    cd ..
+    
+    log_success "Frontend tests completed"
+}
+
+# Security tests
+run_security_tests() {
+    log_info "Running security tests..."
+    
+    # Python security scan with bandit
+    log_info "Running bandit security scan..."
+    bandit -r app/ -f json -o bandit-report.json || {
+        log_warning "Bandit found security issues (see bandit-report.json)"
+    }
+    
+    # Check for known vulnerabilities in Python packages
+    log_info "Checking Python packages for vulnerabilities..."
+    safety check --json --output safety-report.json || {
+        log_warning "Safety found vulnerable packages (see safety-report.json)"
+    }
+    
+    # Frontend security audit
+    if [ -d "frontend/node_modules" ]; then
+        log_info "Running npm audit for frontend..."
+        cd frontend
+        npm audit --audit-level=high --json > ../npm-audit-report.json || {
+            log_warning "npm audit found vulnerabilities (see npm-audit-report.json)"
+        }
+        cd ..
+    fi
+    
+    log_success "Security tests completed"
+}
+
+# Performance tests
+run_performance_tests() {
+    log_info "Running performance tests..."
+    
+    # Start application for performance testing
+    ./BANG_BACKEND_ONLY &
+    BACKEND_PID=$!
+    
+    # Wait for backend to be ready
+    sleep 10
+    curl -f http://localhost:8000/health || {
+        log_error "Backend not ready for performance tests"
+        kill $BACKEND_PID || true
+        return 1
+    }
+    
+    # Create Locust test file
+    cat << 'EOF' > locustfile.py
+from locust import HttpUser, task, between
+import json
+
+class PriceManagerUser(HttpUser):
+    wait_time = between(1, 3)
+    
+    def on_start(self):
+        # Test data
+        self.test_price_data = {
+            "product_id": "UHJvZHVjdDox",
+            "channel_id": "Q2hhbm5lbDoy",
+            "base_price": 100.0
+        }
+    
+    @task(10)
+    def test_health(self):
+        with self.client.get("/health", catch_response=True) as response:
+            if response.status_code == 200:
+                response.success()
+    
+    @task(5)
+    def test_channels(self):
+        with self.client.get("/api/channels/", catch_response=True) as response:
+            if response.status_code == 200 and response.json():
+                response.success()
+    
+    @task(3)
+    def test_price_calculation(self):
+        with self.client.post(
+            "/api/prices/calculate",
+            json=self.test_price_data,
+            catch_response=True
+        ) as response:
+            if response.status_code == 200:
+                data = response.json()
+                if "final_price" in data:
+                    response.success()
+                else:
+                    response.failure("Missing final_price in response")
+    
+    @task(1)
+    def test_docs(self):
+        with self.client.get("/docs", catch_response=True) as response:
+            if response.status_code == 200:
+                response.success()
+EOF
+    
+    # Run performance test
+    log_info "Running load test with Locust..."
+    timeout 120 locust \
+        -f locustfile.py \
+        --host=http://localhost:8000 \
+        --users 20 \
+        --spawn-rate 5 \
+        --run-time 60s \
+        --headless \
+        --html perf-report.html \
+        --csv perf-results || {
+        
+        log_warning "Performance test completed with issues"
+    }
+    
+    # Cleanup
+    kill $BACKEND_PID || true
+    rm -f locustfile.py
+    
+    log_success "Performance tests completed"
+}
+
+# Integration tests
+run_integration_tests() {
+    log_info "Running integration tests..."
+    
+    # Deploy application
+    log_info "Deploying application for integration tests..."
+    ./DEPLOY > /dev/null 2>&1 || {
+        log_error "Deployment failed"
+        return 1
+    }
+    
+    # Start full application
+    timeout 60s ./BANG &
+    APP_PID=$!
+    
+    # Wait for application to be ready
+    local retry_count=0
+    while ! curl -sf http://localhost:8000/health >/dev/null 2>&1; do
+        if [ $retry_count -ge 60 ]; then
+            log_error "Application failed to start within 60 seconds"
+            kill $APP_PID || true
+            return 1
+        fi
+        sleep 1
+        ((retry_count++))
+    done
+    
+    # Test all endpoints
+    local endpoints=(
+        "/health"
+        "/api/channels/"
+        "/docs"
+        "/redoc"
+    )
+    
+    for endpoint in "${endpoints[@]}"; do
+        log_info "Testing endpoint: $endpoint"
+        curl -sf "http://localhost:8000$endpoint" >/dev/null || {
+            log_error "Endpoint $endpoint failed"
+            kill $APP_PID || true
+            return 1
+        }
+    done
+    
+    # Test price calculation API
+    log_info "Testing price calculation API..."
+    curl -sf -X POST "http://localhost:8000/api/prices/calculate" \
+        -H "Content-Type: application/json" \
+        -d '{"product_id":"UHJvZHVjdDox","channel_id":"Q2hhbm5lbDoy","base_price":100.0}' | \
+        jq '.final_price' >/dev/null || {
+        
+        log_error "Price calculation API failed"
+        kill $APP_PID || true
+        return 1
+    }
+    
+    # Cleanup
+    kill $APP_PID || true
+    
+    log_success "Integration tests completed"
+}
+
+# Generate comprehensive test report
+generate_test_report() {
+    log_info "Generating comprehensive test report..."
+    
+    local report_file="test-report-$(date +%Y%m%d-%H%M%S).html"
+    
+    cat << EOF > "$report_file"
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Saleor Price Manager - Test Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { background: #f0f0f0; padding: 15px; border-radius: 5px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .warning { background: #fff3cd; border-color: #ffeaa7; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        .timestamp { color: #666; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Saleor Price Manager - Test Report</h1>
+        <p class="timestamp">Generated on: $(date)</p>
+        <p>Repository: $(git remote get-url origin 2>/dev/null || echo "Local")</p>
+        <p>Branch: $(git branch --show-current 2>/dev/null || echo "Unknown")</p>
+        <p>Commit: $(git rev-parse HEAD 2>/dev/null || echo "Unknown")</p>
+    </div>
+EOF
+    
+    # Add test results sections
+    if [ -f "coverage.xml" ]; then
+        coverage_percent=$(grep -o 'line-rate="[0-9.]*"' coverage.xml | head -1 | cut -d'"' -f2 | awk '{print int($1*100)}')
+        echo "    <div class='section success'><h2>✅ API Test Coverage: ${coverage_percent}%</h2></div>" >> "$report_file"
+    fi
+    
+    if [ -f "bandit-report.json" ]; then
+        security_issues=$(jq '.results | length' bandit-report.json 2>/dev/null || echo "N/A")
+        echo "    <div class='section warning'><h2>🔒 Security Issues Found: $security_issues</h2></div>" >> "$report_file"
+    fi
+    
+    if [ -f "perf-report.html" ]; then
+        echo "    <div class='section success'><h2>⚡ Performance Test</h2><p><a href='perf-report.html'>View Performance Report</a></p></div>" >> "$report_file"
+    fi
+    
+    # Close HTML
+    echo "</body></html>" >> "$report_file"
+    
+    log_success "Test report generated: $report_file"
+}
+
+# Main execution
+main() {
+    setup_test_environment
+    
+    local exit_code=0
+    
+    case "$TEST_TYPE" in
+        "quick")
+            run_quick_tests || exit_code=1
+            ;;
+        "rust")
+            run_rust_tests || exit_code=1
+            ;;
+        "api")
+            run_quick_tests || exit_code=1
+            run_rust_tests || exit_code=1
+            run_api_tests || exit_code=1
+            ;;
+        "frontend")
+            run_frontend_tests || exit_code=1
+            ;;
+        "security")
+            run_security_tests || exit_code=1
+            ;;
+        "performance")
+            run_performance_tests || exit_code=1
+            ;;
+        "integration")
+            run_integration_tests || exit_code=1
+            ;;
+        "all")
+            run_quick_tests || exit_code=1
+            run_rust_tests || exit_code=1
+            run_api_tests || exit_code=1
+            run_frontend_tests || exit_code=1
+            run_security_tests || exit_code=1
+            run_performance_tests || exit_code=1
+            run_integration_tests || exit_code=1
+            ;;
+        *)
+            log_error "Unknown test type: $TEST_TYPE"
+            log_info "Available options: quick, rust, api, frontend, security, performance, integration, all"
+            exit 1
+            ;;
+    esac
+    
+    generate_test_report
+    
+    if [ $exit_code -eq 0 ]; then
+        log_success "🎉 All tests completed successfully!"
+    else
+        log_error "❌ Some tests failed. Check the output above."
+    fi
+    
+    return $exit_code
+}
+
+# Execute main function
+main "$@"
