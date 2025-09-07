@@ -41,6 +41,9 @@ class ApiError extends Error {
   }
 }
 
+// Create a fetch function that doesn't get intercepted by SvelteKit
+const directFetch = typeof window !== 'undefined' ? window.fetch.bind(window) : fetch;
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'Unknown error');
@@ -64,7 +67,14 @@ export const api = {
     const url = subdomain 
       ? `${API_ENDPOINTS.CHANNELS}?subdomain=${encodeURIComponent(subdomain)}`
       : API_ENDPOINTS.CHANNELS;
-    const response = await fetch(url);
+    const response = await directFetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      mode: 'cors'
+    });
     return handleResponse<Channel[]>(response);
   },
 
@@ -74,29 +84,39 @@ export const api = {
   },
 
   async updateMarkup(markup: MarkupUpdate): Promise<{ success: boolean; markup: MarkupUpdate }> {
-    const response = await fetch(API_ENDPOINTS.CHANNEL_MARKUP, {
+    const response = await directFetch(API_ENDPOINTS.CHANNEL_MARKUP, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
+      mode: 'cors',
       body: JSON.stringify(markup)
     });
     return handleResponse<{ success: boolean; markup: MarkupUpdate }>(response);
   },
 
   async calculatePrice(request: PriceCalculationRequest): Promise<PriceCalculation> {
-    const response = await fetch(API_ENDPOINTS.PRICE_CALCULATE, {
+    const response = await directFetch(API_ENDPOINTS.PRICE_CALCULATE, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
+      mode: 'cors',
       body: JSON.stringify(request)
     });
     return handleResponse<PriceCalculation>(response);
   },
 
   async healthCheck(): Promise<{ status: string }> {
-    const response = await fetch(API_ENDPOINTS.HEALTH);
+    const response = await directFetch(API_ENDPOINTS.HEALTH, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      },
+      mode: 'cors'
+    });
     return handleResponse<{ status: string }>(response);
   }
 };
@@ -116,8 +136,13 @@ export const subdomainApi = {
     url.searchParams.set('base_price', basePrice.toString());
     url.searchParams.set('subdomain', subdomain);
     
-    const response = await fetch(url.toString(), {
-      method: 'POST'
+    const response = await directFetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      mode: 'cors'
     });
     return handleResponse<PriceCalculation>(response);
   }
