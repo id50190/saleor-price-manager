@@ -207,14 +207,50 @@ fi
 # Start the backend application
 echo "Starting backend API server..."
 if [[ "${RELOAD:-true}" == "true" ]]; then
-  # Development mode with auto-reload (exclude frontend to prevent file watch limits)
-  uvicorn main:app --reload --host "${APPLICATION_HOST}" --port "${APPLICATION_PORT}" \
-    --reload-exclude "frontend/*" \
-    --reload-exclude "frontend-react-backup/*" \
-    --reload-exclude "**/node_modules/*" \
-    --reload-exclude "**/.svelte-kit/*" \
-    --reload-exclude "**/__pycache__/*" \
-    --reload-exclude "**/.*"
+  # Development mode with optimized file watching
+  WATCH_DIRS="${UVICORN_WATCH_DIRS:-app,.}"
+  WATCH_INCLUDES="${UVICORN_WATCH_INCLUDES:-*.py,requirements*.txt}"
+  
+  echo "🔍 Optimized Uvicorn file watching:"
+  echo "   ✅ Watching dirs: ${WATCH_DIRS}"
+  echo "   ✅ Including: ${WATCH_INCLUDES}"
+  echo "   ❌ Excluding: frontend/, env/, .git/, logs/, node_modules/, etc."
+  
+  # Build reload-dir arguments dynamically
+  RELOAD_DIRS=""
+  IFS=',' read -ra DIRS <<< "$WATCH_DIRS"
+  for dir in "${DIRS[@]}"; do
+    RELOAD_DIRS="$RELOAD_DIRS --reload-dir \"$(echo "$dir" | xargs)\""
+  done
+  
+  # Build reload-include arguments dynamically  
+  RELOAD_INCLUDES=""
+  IFS=',' read -ra INCLUDES <<< "$WATCH_INCLUDES"
+  for include in "${INCLUDES[@]}"; do
+    RELOAD_INCLUDES="$RELOAD_INCLUDES --reload-include \"$(echo "$include" | xargs)\""
+  done
+  
+  eval "uvicorn main:app --reload --host \"${APPLICATION_HOST}\" --port \"${APPLICATION_PORT}\" \
+    $RELOAD_DIRS \
+    $RELOAD_INCLUDES \
+    --reload-exclude \"frontend/*\" \
+    --reload-exclude \"frontend-react-backup/*\" \
+    --reload-exclude \"env/*\" \
+    --reload-exclude \".git/*\" \
+    --reload-exclude \"log/*\" \
+    --reload-exclude \"run/*\" \
+    --reload-exclude \"htmlcov/*\" \
+    --reload-exclude \".pytest_cache/*\" \
+    --reload-exclude \"**/node_modules/*\" \
+    --reload-exclude \"**/.svelte-kit/*\" \
+    --reload-exclude \"**/__pycache__/*\" \
+    --reload-exclude \"**/.*\" \
+    --reload-exclude \"tests/*\" \
+    --reload-exclude \"docs/*\" \
+    --reload-exclude \"static/*\" \
+    --reload-exclude \"templates/*\" \
+    --reload-exclude \"legacy/*\" \
+    --reload-exclude \"rust_modules/*/target/*\""
 else
   # Production mode
   uvicorn main:app --host "${APPLICATION_HOST}" --port "${APPLICATION_PORT}" --workers 4

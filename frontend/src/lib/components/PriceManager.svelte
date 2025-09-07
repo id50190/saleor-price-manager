@@ -12,6 +12,7 @@
   import { getSubdomainFromUrl } from '$lib/utils';
 
   let selectedChannel: Channel | null = null;
+  let selectedChannelId: string | null = null;
   let selectedSubdomain = getSubdomainFromUrl() || '';
   let filteredBySubdomain = false;
 
@@ -85,6 +86,7 @@
 
   function handleChannelChange(event: CustomEvent<{channel: Channel | null}>) {
     selectedChannel = event.detail.channel;
+    selectedChannelId = selectedChannel?.id || null;
     // Reset subdomain when channel changes
     selectedSubdomain = '';
     if (selectedChannel) {
@@ -103,6 +105,19 @@
     }
   }
 
+  // Reactive updates
+  $: {
+    // Sync selectedChannel when selectedChannelId changes
+    if (selectedChannelId && $channels) {
+      const channel = $channels.find(c => c.id === selectedChannelId);
+      if (channel && channel !== selectedChannel) {
+        selectedChannel = channel;
+      }
+    } else if (!selectedChannelId) {
+      selectedChannel = null;
+    }
+  }
+
   // Load channels on component mount
   onMount(() => {
     fetchChannels(selectedSubdomain);
@@ -113,7 +128,7 @@
   <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">📊 Channel Management</h2>
   
   <ChannelSelector 
-    bind:selectedChannelId={selectedChannel?.id}
+    bind:selectedChannelId
     on:change={handleChannelChange}
   />
   
