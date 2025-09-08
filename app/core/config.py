@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict, Field
 from typing import List, Optional
 import json
-from pydantic import Field
 
 class Settings(BaseSettings):
     APP_URL: str
@@ -34,9 +34,10 @@ class Settings(BaseSettings):
             return [self.CORS_ORIGINS.strip()]
         return []
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"  # Ignore extra fields instead of raising validation errors
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"  # Ignore extra fields instead of raising validation errors
+    )
 
 settings = Settings()
